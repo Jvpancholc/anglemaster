@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lightbulb, Zap, Plus, ArrowRight, CheckSquare, Square, Trash2 } from "lucide-react";
-import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ const MOCK_ANGLES = [
 
 export default function AngulosPage() {
     const router = useRouter();
-    const { activeProjectId, projects, updateProject } = useProjectStore();
     const [mounted, setMounted] = useState(false);
 
     // Internal state for angles array
@@ -29,25 +27,31 @@ export default function AngulosPage() {
     const [showManualInput, setShowManualInput] = useState(false);
     const [manualAngleText, setManualAngleText] = useState("");
 
+    // Load from localStorage on mount
     useEffect(() => {
         setMounted(true);
-        if (!activeProjectId) {
-            router.push("/");
-            return;
+        const savedAngles = localStorage.getItem("selectedAngles");
+        if (savedAngles) {
+            try {
+                setAngles(JSON.parse(savedAngles));
+            } catch (e) {
+                console.error("Error parsing saved angles", e);
+            }
         }
+    }, []);
 
-        const project = projects.find(p => p.id === activeProjectId);
-        if (project && project.angles && project.angles.length > 0) {
-            setAngles(project.angles);
+    // Save to localStorage whenever angles state changes (realtime persistence)
+    useEffect(() => {
+        if (mounted) {
+            localStorage.setItem("selectedAngles", JSON.stringify(angles));
         }
-    }, [activeProjectId, projects, router]);
+    }, [angles, mounted]);
 
     const handleGenerate = () => {
         setIsGenerating(true);
         // Simulate API call
         setTimeout(() => {
             const newAngles = MOCK_ANGLES.map(a => ({ ...a, selected: false, id: crypto.randomUUID() }));
-            // Add to existing, avoid duplicates by text in a real app, but fine for mock
             setAngles(prev => [...prev, ...newAngles]);
             setIsGenerating(false);
             toast.success("Ángulos generados por IA.");
@@ -73,17 +77,14 @@ export default function AngulosPage() {
     };
 
     const handleSave = () => {
-        if (!activeProjectId) return;
-
         const selectedCount = angles.filter(a => a.selected).length;
         if (selectedCount === 0) {
             toast.error("Selecciona al menos un ángulo para continuar.");
             return;
         }
 
-        updateProject(activeProjectId, {
-            angles: angles // save all, or just selected. We save all to keep state intact
-        });
+        // Explicitly format and save to local storage again just to be certain
+        localStorage.setItem("selectedAngles", JSON.stringify(angles));
 
         toast.success(`${selectedCount} ángulos guardados correctamente.`);
         router.push("/fabrica");

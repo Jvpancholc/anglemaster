@@ -16,6 +16,11 @@ export interface Project {
         secondaryColor: string;
         typography: string;
         logoUrl?: string;
+        slogan?: string;
+        includeSlogan?: boolean;
+        logoVariations?: { full?: string; icon?: string; text?: string };
+        logoGenerated?: boolean;
+        brandDescription?: string;
     };
     creativeFormats: string[];
     visualStyle: string | null;
@@ -52,6 +57,11 @@ const emptyProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'name'> = {
         primaryColor: '#6366f1',
         secondaryColor: '#a855f7',
         typography: 'Inter',
+        slogan: '',
+        includeSlogan: false,
+        logoVariations: {},
+        logoGenerated: false,
+        brandDescription: '',
     },
     creativeFormats: [],
     visualStyle: null,
