@@ -1,236 +1,160 @@
 "use client";
 
-import { useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Palette, Type, Image as ImageIcon, UploadCloud } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Upload, Type, Palette, ArrowRight } from "lucide-react";
+import { useProjectStore } from "@/lib/store";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-// Note: In a real app we would want validation for file type and size.
-// Since inputs of type file are notoriously tricky with react-hook-form/zod, we are keeping it simple for now.
-const formSchema = z.object({
-    primaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
-        message: "Debe ser un código hexadecimal válido (ej. #FFFFFF)",
-    }),
-    secondaryColor: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, {
-        message: "Debe ser un código hexadecimal válido (ej. #000000)",
-    }),
-    typography: z.string().min(1, { message: "Selecciona una tipografía" }),
-    // Logo is handled separately via state since file objects don't serialize well in typical setups
-});
+import { Button } from "@/components/ui/button";
 
 export default function IdentidadVisualPage() {
-    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const router = useRouter();
+    const { activeProjectId, projects, updateProject } = useProjectStore();
+    const [mounted, setMounted] = useState(false);
 
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
-        defaultValues: {
-            primaryColor: "#4f46e5", // Indigo-600 default
-            secondaryColor: "#ec4899", // Pink-500 default
-            typography: "inter", // Default font
-        },
-    });
+    const [primaryColor, setPrimaryColor] = useState("#6366f1");
+    const [secondaryColor, setSecondaryColor] = useState("#a855f7");
+    const [typography, setTypography] = useState("Inter");
 
-    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            // Create a preview URL for the selected image
-            const previewUrl = URL.createObjectURL(file);
-            setLogoPreview(previewUrl);
+    useEffect(() => {
+        setMounted(true);
+        if (!activeProjectId) {
+            router.push("/");
+            return;
         }
+
+        const project = projects.find(p => p.id === activeProjectId);
+        if (project) {
+            setPrimaryColor(project.identity.primaryColor || "#6366f1");
+            setSecondaryColor(project.identity.secondaryColor || "#a855f7");
+            setTypography(project.identity.typography || "Inter");
+        }
+    }, [activeProjectId, projects, router]);
+
+    const handleSave = () => {
+        if (!activeProjectId) return;
+
+        updateProject(activeProjectId, {
+            identity: {
+                ...projects.find(p => p.id === activeProjectId)?.identity,
+                primaryColor,
+                secondaryColor,
+                typography
+            }
+        });
+
+        toast.success("Identidad visual guardada exitosamente");
+        router.push("/formato-creativo");
     };
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        // Add logo data to submission payload in reality
-        const payload = {
-            ...values,
-            hasLogo: !!logoPreview,
-        };
-        console.log(payload);
-        alert("¡Identidad visual guardada exitosamente!");
-    }
+    if (!mounted) return null;
 
     return (
-        <div className="flex flex-col gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Identidad Visual</h1>
                 <p className="text-muted-foreground mt-2">
-                    Sube tus logos, paletas de colores y tipografías para mantener consistencia de marca.
+                    Define los activos visuales de tu marca. La IA generará creativos alineados a esta guía.
                 </p>
             </div>
 
-            <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-2xl overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-rose-500/5 pointer-events-none" />
+            <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-2xl relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-orange-500/5 pointer-events-none" />
                 <CardHeader className="relative z-10">
-                    <CardTitle>Configuración de Marca</CardTitle>
+                    <CardTitle>Activos de Marca</CardTitle>
                     <CardDescription>
-                        Definir bien estos elementos asegura que los creativos generados sigan la misma línea visual.
+                        Asegúrate de mantener consistencia visual en todos tus anuncios.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="relative z-10">
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <CardContent className="space-y-8 relative z-10">
 
-                            {/* Logo Section */}
-                            <div className="space-y-4">
-                                <FormLabel className="flex items-center gap-2">
-                                    <ImageIcon className="w-4 h-4 text-pink-400" /> Logo Principal
-                                </FormLabel>
-                                <div className="flex items-start gap-6">
-                                    {/* Preview Area */}
-                                    <div className="h-32 w-32 rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center bg-white/5 overflow-hidden shrink-0 transition-all hover:bg-white/10 hover:border-pink-500/50 relative group">
-                                        {logoPreview ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain p-2" />
-                                        ) : (
-                                            <ImageIcon className="h-8 w-8 text-white/20 group-hover:text-pink-400/50 transition-colors" />
-                                        )}
-                                        <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                                    </div>
+                    {/* Sección Logo */}
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                            <Upload className="w-4 h-4 text-pink-400" /> Logo Principal
+                        </h3>
+                        <div className="border-2 border-dashed border-white/20 rounded-xl bg-white/5 p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition group">
+                            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4 group-hover:scale-110 transition">
+                                <Upload className="w-8 h-8 text-zinc-300" />
+                            </div>
+                            <p className="text-zinc-200 font-medium mb-1">Haz clic para subir tu logo</p>
+                            <p className="text-zinc-500 text-sm">PNG o SVG recomendado. Fondo transparente.</p>
+                        </div>
+                    </div>
 
-                                    {/* Upload Controls */}
-                                    <div className="space-y-3 flex-1">
-                                        <div className="flex flex-col gap-2">
-                                            <Button variant="outline" type="button" className="relative cursor-pointer w-fit bg-white/5 border-white/10 hover:bg-white/10 hover:text-white">
-                                                <UploadCloud className="mr-2 h-4 w-4 text-pink-400" /> Subir Logo
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                    onChange={handleLogoUpload}
-                                                />
-                                            </Button>
-                                            <span className="text-sm text-muted-foreground">Recomendado: Logo transparente en PNG o SVG. Max 5MB.</span>
-                                        </div>
-                                    </div>
+                    {/* Sección Tipografía */}
+                    <div className="space-y-4 pt-4 border-t border-white/10">
+                        <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                            <Type className="w-4 h-4 text-orange-400" /> Tipografía Principal
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            {['Inter', 'Roboto', 'Playfair Display', 'Montserrat'].map((font) => (
+                                <div
+                                    key={font}
+                                    onClick={() => setTypography(font)}
+                                    className={`p-4 rounded-xl border cursor-pointer transition-all text-center ${typography === font
+                                            ? "bg-orange-500/10 border-orange-500 text-orange-400 font-bold"
+                                            : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                                        }`}
+                                >
+                                    <span style={{ fontFamily: font }}>Aa</span>
+                                    <p className="text-xs mt-2">{font}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Sección Colores */}
+                    <div className="space-y-4 pt-4 border-t border-white/10">
+                        <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                            <Palette className="w-4 h-4 text-fuchsia-400" /> Colores de Marca
+                        </h3>
+                        <div className="flex flex-col sm:flex-row gap-6 bg-white/5 p-6 rounded-xl border border-white/10">
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col">
+                                    <label className="text-sm font-medium text-zinc-200">Color Primario</label>
+                                    <span className="text-xs text-zinc-500">Predominante</span>
+                                </div>
+                                <input
+                                    type="color"
+                                    value={primaryColor}
+                                    onChange={(e) => setPrimaryColor(e.target.value)}
+                                    className="w-16 h-16 rounded-xl cursor-pointer bg-transparent border-0 p-0"
+                                />
+                                <div className="px-3 py-1 bg-black/50 rounded-md font-mono text-xs text-zinc-400 border border-white/10 uppercase">
+                                    {primaryColor}
                                 </div>
                             </div>
 
-                            {/* Colors Section */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField
-                                    control={form.control}
-                                    name="primaryColor"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="flex items-center gap-2">
-                                                <Palette className="w-4 h-4 text-violet-400" /> Color Principal
-                                            </FormLabel>
-                                            <FormControl>
-                                                <div className="flex gap-3 items-center">
-                                                    <div className="relative rounded-md overflow-hidden h-10 w-16 border border-white/10 shrink-0">
-                                                        <input
-                                                            type="color"
-                                                            className="absolute -inset-2 w-[150%] h-[150%] cursor-pointer"
-                                                            {...field}
-                                                        />
-                                                    </div>
-                                                    <Input
-                                                        type="text"
-                                                        className="flex-1 font-mono uppercase bg-white/5 border-white/10 focus-visible:ring-violet-500"
-                                                        {...field}
-                                                    />
-                                                </div>
-                                            </FormControl>
-                                            <FormDescription>
-                                                El color que más destaca en tu marca.
-                                            </FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
+                            <div className="hidden sm:block w-px bg-white/10 mx-2" />
+
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col">
+                                    <label className="text-sm font-medium text-zinc-200">Color Secundario</label>
+                                    <span className="text-xs text-zinc-500">Acentos</span>
+                                </div>
+                                <input
+                                    type="color"
+                                    value={secondaryColor}
+                                    onChange={(e) => setSecondaryColor(e.target.value)}
+                                    className="w-16 h-16 rounded-xl cursor-pointer bg-transparent border-0 p-0"
                                 />
-
-                                <FormField
-                                    control={form.control}
-                                    name="secondaryColor"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="flex items-center gap-2">
-                                                <Palette className="w-4 h-4 text-fuchsia-400" /> Color Secundario
-                                            </FormLabel>
-                                            <FormControl>
-                                                <div className="flex gap-3 items-center">
-                                                    <div className="relative rounded-md overflow-hidden h-10 w-16 border border-white/10 shrink-0">
-                                                        <input
-                                                            type="color"
-                                                            className="absolute -inset-2 w-[150%] h-[150%] cursor-pointer"
-                                                            {...field}
-                                                        />
-                                                    </div>
-                                                    <Input
-                                                        type="text"
-                                                        className="flex-1 font-mono uppercase bg-white/5 border-white/10 focus-visible:ring-fuchsia-500"
-                                                        {...field}
-                                                    />
-                                                </div>
-                                            </FormControl>
-                                            <FormDescription>
-                                                Color de acento o apoyo.
-                                            </FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                <div className="px-3 py-1 bg-black/50 rounded-md font-mono text-xs text-zinc-400 border border-white/10 uppercase">
+                                    {secondaryColor}
+                                </div>
                             </div>
+                        </div>
+                    </div>
 
-                            {/* Typography Section */}
-                            <FormField
-                                control={form.control}
-                                name="typography"
-                                render={({ field }) => (
-                                    <FormItem className="max-w-md">
-                                        <FormLabel className="flex items-center gap-2">
-                                            <Type className="w-4 h-4 text-sky-400" /> Tipografía Principal
-                                        </FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger className="bg-white/5 border-white/10 focus:ring-sky-500">
-                                                    <SelectValue placeholder="Selecciona una fuente" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent className="bg-zinc-950 border-white/10">
-                                                <SelectItem value="inter">Inter (Moderna y Limpia)</SelectItem>
-                                                <SelectItem value="roboto">Roboto (Versátil e Institucional)</SelectItem>
-                                                <SelectItem value="playfair">Playfair Display (Elegante y Clásica)</SelectItem>
-                                                <SelectItem value="montserrat">Montserrat (Impactante y Geométrica)</SelectItem>
-                                                <SelectItem value="poppins">Poppins (Amigable y Redondeada)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormDescription>
-                                            La tipografía que se usará en los textos destacados de tus creativos.
-                                        </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <div className="flex justify-end pt-4">
-                                <Button type="submit" className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:shadow-[0_0_25px_rgba(236,72,153,0.5)] transition-all duration-300">
-                                    Guardar Identidad Visual
-                                </Button>
-                            </div>
-                        </form>
-                    </Form>
+                    <div className="pt-8 flex justify-end">
+                        <Button
+                            onClick={handleSave}
+                            className="bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white font-semibold shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all px-8 py-5 rounded-full"
+                        >
+                            Guardar Identidad Visual <ArrowRight className="w-4 h-4 ml-2 mt-0.5" />
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
         </div>

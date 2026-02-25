@@ -1,58 +1,218 @@
-import { Target, Zap, Plus } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Lightbulb, Zap, Plus, ArrowRight, CheckSquare, Square, Trash2 } from "lucide-react";
+import { useProjectStore } from "@/lib/store";
+import { toast } from "sonner";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+const MOCK_ANGLES = [
+    { id: "mock-1", text: "Ahorra 10 horas semanales automatizando procesos clave." },
+    { id: "mock-2", text: "El secreto que tu competencia no quiere que sepas sobre retención." },
+    { id: "mock-3", text: "De cero a experto: transformamos la curva de aprendizaje en una línea recta." },
+    { id: "mock-4", text: "Por qué el método tradicional te está haciendo perder dinero sin darte cuenta." },
+];
 
 export default function AngulosPage() {
+    const router = useRouter();
+    const { activeProjectId, projects, updateProject } = useProjectStore();
+    const [mounted, setMounted] = useState(false);
+
+    // Internal state for angles array
+    const [angles, setAngles] = useState<{ id: string; text: string; selected: boolean }[]>([]);
+
+    // UI state
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [showManualInput, setShowManualInput] = useState(false);
+    const [manualAngleText, setManualAngleText] = useState("");
+
+    useEffect(() => {
+        setMounted(true);
+        if (!activeProjectId) {
+            router.push("/");
+            return;
+        }
+
+        const project = projects.find(p => p.id === activeProjectId);
+        if (project && project.angles && project.angles.length > 0) {
+            setAngles(project.angles);
+        }
+    }, [activeProjectId, projects, router]);
+
+    const handleGenerate = () => {
+        setIsGenerating(true);
+        // Simulate API call
+        setTimeout(() => {
+            const newAngles = MOCK_ANGLES.map(a => ({ ...a, selected: false, id: crypto.randomUUID() }));
+            // Add to existing, avoid duplicates by text in a real app, but fine for mock
+            setAngles(prev => [...prev, ...newAngles]);
+            setIsGenerating(false);
+            toast.success("Ángulos generados por IA.");
+        }, 1500);
+    };
+
+    const handleAddManual = () => {
+        if (!manualAngleText.trim()) return;
+        setAngles(prev => [
+            { id: crypto.randomUUID(), text: manualAngleText, selected: true },
+            ...prev
+        ]);
+        setManualAngleText("");
+        setShowManualInput(false);
+    };
+
+    const toggleAngleSelection = (id: string) => {
+        setAngles(prev => prev.map(a => a.id === id ? { ...a, selected: !a.selected } : a));
+    };
+
+    const deleteAngle = (id: string) => {
+        setAngles(prev => prev.filter(a => a.id !== id));
+    };
+
+    const handleSave = () => {
+        if (!activeProjectId) return;
+
+        const selectedCount = angles.filter(a => a.selected).length;
+        if (selectedCount === 0) {
+            toast.error("Selecciona al menos un ángulo para continuar.");
+            return;
+        }
+
+        updateProject(activeProjectId, {
+            angles: angles // save all, or just selected. We save all to keep state intact
+        });
+
+        toast.success(`${selectedCount} ángulos guardados correctamente.`);
+        router.push("/fabrica");
+    };
+
+    if (!mounted) return null;
+
     return (
-        <div className="flex flex-col gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                        <Target className="w-8 h-8 text-red-500" />
-                        Ángulos de Marketing
+        <div className="flex flex-col gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+            <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-end">
+                <div className="text-center sm:text-left flex flex-col items-center sm:items-start">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 font-medium mb-4">
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        Persuasión y Copywriting
+                    </div>
+                    <h1 className="text-4xl font-bold tracking-tight mb-2">
+                        Ángulos de <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">Venta</span>
                     </h1>
-                    <p className="text-muted-foreground mt-2 text-lg">
-                        Define los diferentes "hooks" o enfoques para vender tu producto.
+                    <p className="text-zinc-400 text-lg max-w-xl">
+                        Basado en el ADN de tu producto, la IA elaborará ideas disruptivas para atacar los dolores de tu avatar.
                     </p>
                 </div>
-                <Button className="bg-red-600 hover:bg-red-500 text-white rounded-full shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-                    <Plus className="w-4 h-4 mr-2" /> Nuevo Ángulo
-                </Button>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <Button
+                        onClick={handleGenerate}
+                        disabled={isGenerating}
+                        className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold"
+                    >
+                        {isGenerating ? (
+                            <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" /> Analizando ADN...</span>
+                        ) : (
+                            <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Generar Ángulos de Marketing</span>
+                        )}
+                    </Button>
+                    <Button
+                        onClick={() => setShowManualInput(!showManualInput)}
+                        variant="outline"
+                        className="bg-white/5 border-white/10 hover:bg-white/10 font-semibold"
+                    >
+                        <Plus className="w-4 h-4 mr-2" /> Crear Manualmente
+                    </Button>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-4">
-                        <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]" />
-                    </div>
-                    <CardHeader>
-                        <CardTitle className="text-xl flex items-center justify-between">
-                            El Problema Urgente
-                        </CardTitle>
-                        <CardDescription>
-                            Enfocado en el dolor inmediato del cliente.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-zinc-400 text-sm mb-4">
-                            "¿Cansado de perder tiempo limpiando? Descubre cómo este dispositivo lo hace por ti mientras duermes."
-                        </p>
-                        <Button variant="outline" className="w-full bg-white/5 border-white/10 hover:bg-white/10 text-white">
-                            Usar en Creativos
+            {/* Manual Input Area */}
+            {showManualInput && (
+                <Card className="bg-zinc-900 border-white/10 shadow-lg animate-in slide-in-from-top-2">
+                    <CardContent className="p-4 flex gap-3">
+                        <Input
+                            value={manualAngleText}
+                            onChange={(e) => setManualAngleText(e.target.value)}
+                            placeholder="Ej. Descubre cómo triplicar tus leads sin aumentar el presupuesto en ads."
+                            className="bg-black/50 border-white/10 focus-visible:ring-amber-500 text-base py-6"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddManual()}
+                        />
+                        <Button onClick={handleAddManual} className="bg-amber-600 hover:bg-amber-500 text-white h-auto px-6">
+                            Añadir
                         </Button>
                     </CardContent>
                 </Card>
+            )}
 
-                <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-xl relative overflow-hidden border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center h-full min-h-[220px] text-zinc-500 hover:text-white hover:bg-white/5 transition-colors cursor-pointer">
-                        <Zap className="w-8 h-8 mb-4 text-red-400 opacity-50" />
-                        <p className="font-medium">Generar Ángulos con IA</p>
-                        <p className="text-sm mt-1 text-center max-w-[250px]">
-                            La IA usará la configuración de tu negocio para crear ideas ganadoras.
+            {/* Angles List */}
+            <div className="space-y-4">
+                {angles.length === 0 ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-center border border-dashed border-white/10 rounded-2xl bg-white/5">
+                        <Lightbulb className="w-12 h-12 text-zinc-600 mb-4" />
+                        <h3 className="text-xl font-bold text-zinc-400 mb-2">No tienes ángulos generados</h3>
+                        <p className="text-zinc-500 max-w-md">
+                            Haz clic en "Generar Ángulos" para que la IA haga el trabajo pesado, o crea uno manual.
                         </p>
-                    </CardContent>
-                </Card>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                        {angles.map((angle) => (
+                            <Card
+                                key={angle.id}
+                                onClick={() => toggleAngleSelection(angle.id)}
+                                className={`cursor-pointer transition-all duration-200 border-l-4 ${angle.selected
+                                        ? "bg-amber-500/10 border-amber-500 border-y-white/10 border-r-white/10"
+                                        : "bg-zinc-950 border-white/5 hover:bg-zinc-900"
+                                    }`}
+                            >
+                                <CardContent className="p-4 flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 flex-1">
+                                        <button className={`shrink-0 rounded-md flex items-center justify-center transition-colors ${angle.selected ? "text-amber-500" : "text-zinc-600"}`}>
+                                            {angle.selected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6" />}
+                                        </button>
+                                        <p className={`text-sm sm:text-base leading-relaxed ${angle.selected ? "text-amber-50 font-medium" : "text-zinc-400"}`}>
+                                            {angle.text}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => { e.stopPropagation(); deleteAngle(angle.id); }}
+                                        className="text-zinc-600 hover:text-red-400 hover:bg-red-400/10 shrink-0"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                )}
             </div>
+
+            {angles.length > 0 && (
+                <div className="sticky bottom-6 mt-4 p-4 rounded-xl bg-black/80 backdrop-blur-xl border border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xl">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                            <span className="font-bold text-amber-500">{angles.filter(a => a.selected).length}</span>
+                        </div>
+                        <div>
+                            <p className="font-semibold text-zinc-200">Ángulos seleccionados</p>
+                            <p className="text-xs text-zinc-500">Estos se utilizarán en la Fábrica Creativa.</p>
+                        </div>
+                    </div>
+
+                    <Button
+                        onClick={handleSave}
+                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base"
+                    >
+                        Guardar Ángulos y Continuar <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }

@@ -4,62 +4,25 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { ArrowRight, Video, Plus, Target, Factory, Rocket } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useProjectStore } from "@/lib/store";
 import { useRouter } from "next/navigation";
 
 export default function DashboardIndexPage() {
-  const { user, isLoaded } = useUser();
-  const [projects, setProjects] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { setActiveProject } = useProjectStore();
+  const { user } = useUser();
+  const { projects, setActiveProject, createProject } = useProjectStore();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      if (!user?.id) return;
-      try {
-        // Fetch projects from Supabase using user_id from Clerk
-        const { data, error } = await supabase
-          .from("projects")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+    setMounted(true);
+  }, []);
 
-        if (error) throw error;
-        setProjects(data || []);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-        setProjects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (isLoaded) {
-      fetchProjects();
-    }
-  }, [user?.id, isLoaded]);
-
-  const handleCreateProject = async () => {
-    if (!user?.id) return;
-    try {
-      const { data, error } = await supabase
-        .from("projects")
-        .insert({ user_id: user.id, business_name: "Mi Nuevo Proyecto" })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setActiveProject(data.id);
-        router.push("/configurar-negocio");
-      }
-    } catch (error) {
-      console.error("Error creating project:", error);
-    }
+  const handleCreateProject = () => {
+    // Create new project with default name
+    const id = createProject("Mi Primer Negocio");
+    router.push("/configurar-negocio");
   };
 
   const handleSelectProject = (projectId: string, href: string) => {
@@ -67,7 +30,9 @@ export default function DashboardIndexPage() {
     router.push(href);
   };
 
-  const firstName = user?.firstName || "Usuario";
+  const firstName = user?.firstName || "Francisco";
+
+  if (!mounted) return null; // Prevenir hidratación incorrecta de zustand (localStorage)
 
   return (
     <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
@@ -193,13 +158,7 @@ export default function DashboardIndexPage() {
           <span className="text-emerald-500">📁</span> Mis Proyectos
         </h2>
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="bg-zinc-950/20 border-white/5 h-32 animate-pulse" />
-            ))}
-          </div>
-        ) : projects.length === 0 ? (
+        {projects.length === 0 ? (
           <Card className="bg-zinc-950/40 border-white/5 border-dashed relative overflow-hidden">
             <div className="absolute top-4 left-4">
               <div className="px-2 py-1 bg-white/10 rounded-md text-[10px] font-bold tracking-widest text-zinc-400 border border-white/5">
@@ -225,11 +184,11 @@ export default function DashboardIndexPage() {
                 <Card className="bg-zinc-950/40 border-white/10 hover:border-emerald-500/40 hover:bg-zinc-900/80 transition-all duration-300 group h-full shadow-lg relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <CardHeader className="p-5 pb-2">
-                    <CardTitle className="text-lg group-hover:text-emerald-400 transition-colors line-clamp-1">{project.business_name || 'Sin Título'}</CardTitle>
+                    <CardTitle className="text-lg group-hover:text-emerald-400 transition-colors line-clamp-1">{project.config.businessName || project.name || 'Sin Título'}</CardTitle>
                   </CardHeader>
                   <CardContent className="p-5 pt-0">
                     <CardDescription className="line-clamp-2 text-zinc-500 mt-2">
-                      {project.product_description || 'Sin descripción del producto...'}
+                      {project.config.description || 'Sin descripción del producto...'}
                     </CardDescription>
                   </CardContent>
                   <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">

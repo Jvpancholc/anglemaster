@@ -1,78 +1,58 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Image as ImageIcon, Smartphone, Laptop, LayoutTemplate, Save, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useProjectStore } from "@/lib/store";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useProjectStore } from "@/lib/store";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { CheckCircle2, ArrowRight } from "lucide-react";
 
 const FORMAT_OPTIONS = [
     {
-        id: "square",
-        title: "Feed Cuadrado",
-        desc: "1080 x 1080 px (1:1)",
-        icon: ImageIcon,
-        text: "Ideal para Facebook Feed, Instagram Feed y Carruseles.",
-        activeColor: "orange"
+        id: "noticiero",
+        title: "Noticiero",
+        desc: "Autoridad inmediata. Presentador de noticias.",
+        color: "emerald"
     },
     {
-        id: "story",
-        title: "Story & Reels",
-        desc: "1080 x 1920 px (9:16)",
-        icon: Smartphone,
-        text: "Óptimo para Instagram Reels, TikTok y YouTube Shorts.",
-        activeColor: "orange"
+        id: "infografia-cta",
+        title: "Infografía con Texto + CTA",
+        desc: "Educativo con llamada a la acción clara.",
+        color: "emerald"
     },
     {
-        id: "landscape",
-        title: "Paisaje",
-        desc: "1200 x 628 px (1.91:1)",
-        icon: Laptop,
-        text: "Para artículos, Facebook in-stream o anuncios en display.",
-        activeColor: "orange"
+        id: "infografia-hook",
+        title: "Infografía solo con 'Hook'",
+        desc: "Gancho visual viral con título gigante.",
+        color: "emerald"
+    },
+    {
+        id: "antes-despues",
+        title: "Antes y Después",
+        desc: "Comparativa impactante de transformación.",
+        color: "emerald"
     }
 ];
 
 export default function FormatoCreativoPage() {
-    const { activeProjectId } = useProjectStore();
     const router = useRouter();
+    const { activeProjectId, projects, updateProject } = useProjectStore();
+    const [mounted, setMounted] = useState(false);
     const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         if (!activeProjectId) {
-            toast.error("Ningún proyecto activo. Selecciona o crea uno en el Dashboard.");
             router.push("/");
             return;
         }
 
-        const loadFormats = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from("creative_formats")
-                    .select("formats")
-                    .eq("project_id", activeProjectId)
-                    .maybeSingle();
-
-                if (error && error.code !== "PGRST116") throw error;
-
-                if (data && data.formats) {
-                    setSelectedFormats(data.formats);
-                }
-            } catch (error) {
-                console.error("Error loading formats:", error);
-                toast.error("Error al cargar los formatos guardados.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadFormats();
-    }, [activeProjectId, router]);
+        const project = projects.find(p => p.id === activeProjectId);
+        if (project && project.creativeFormats) {
+            setSelectedFormats(project.creativeFormats);
+        }
+    }, [activeProjectId, projects, router]);
 
     const toggleFormat = (id: string) => {
         setSelectedFormats(prev =>
@@ -80,103 +60,76 @@ export default function FormatoCreativoPage() {
         );
     };
 
-    const handleSave = async () => {
+    const handleSave = () => {
         if (!activeProjectId) return;
-        setSaving(true);
 
-        try {
-            // Revisa si existe para hacer un update o insert
-            const { data: existing } = await supabase
-                .from("creative_formats")
-                .select("id")
-                .eq("project_id", activeProjectId)
-                .maybeSingle();
+        updateProject(activeProjectId, {
+            creativeFormats: selectedFormats
+        });
 
-            if (existing) {
-                const { error } = await supabase
-                    .from("creative_formats")
-                    .update({ formats: selectedFormats, updated_at: new Date().toISOString() })
-                    .eq("project_id", activeProjectId);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from("creative_formats")
-                    .insert({ project_id: activeProjectId, formats: selectedFormats });
-                if (error) throw error;
-            }
-
-            toast.success("Formatos guardados correctamente.");
-        } catch (error) {
-            console.error("Error saving formats:", error);
-            toast.error("Hubo un problema al guardar los formatos.");
-        } finally {
-            setSaving(false);
-        }
+        toast.success("Formatos guardados con éxito.");
+        router.push("/estilo-visual");
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-            </div>
-        );
-    }
+    if (!mounted) return null;
 
     return (
-        <div className="flex flex-col gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                        <LayoutTemplate className="w-8 h-8 text-orange-500" />
-                        Formatos Creativos
-                    </h1>
-                    <p className="text-muted-foreground mt-2 text-lg">
-                        Selecciona las dimensiones ideales para la plataforma en la que publicarás tus anuncios.
-                    </p>
+        <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+            <div className="text-center sm:text-left flex flex-col items-center sm:items-start">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium mb-4">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Configuración de Formato
                 </div>
-                <Button
-                    onClick={handleSave}
-                    disabled={saving || selectedFormats.length === 0}
-                    className="bg-orange-600 hover:bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all"
-                >
-                    {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Guardar Formatos
-                </Button>
+                <h1 className="text-4xl font-bold tracking-tight mb-2">Formato Creativo</h1>
+                <p className="text-zinc-400 text-lg max-w-2xl">
+                    Activa o desactiva los estilos visuales que la IA utilizará durante la generación.
+                </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {FORMAT_OPTIONS.map((format) => {
                     const isSelected = selectedFormats.includes(format.id);
-                    const Icon = format.icon;
 
                     return (
                         <Card
                             key={format.id}
                             onClick={() => toggleFormat(format.id)}
-                            className={`relative overflow-hidden group cursor-pointer transition-all duration-300 ${isSelected
-                                    ? "border-orange-500/50 bg-orange-500/10 shadow-[0_0_20px_rgba(249,115,22,0.15)] scale-[1.02]"
-                                    : "border-white/5 bg-black/40 hover:bg-black/60 hover:border-white/10"
-                                }`}
+                            className={`relative overflow-hidden group cursor-pointer transition-all duration-300 min-h-[400px] flex flex-col justify-end
+                                ${isSelected
+                                    ? "border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/20 scale-[1.02]"
+                                    : "border-white/10 bg-zinc-950/60 hover:border-white/30"
+                                }
+                            `}
                         >
-                            {isSelected && (
-                                <div className="absolute top-3 right-3 px-2 py-1 bg-orange-500 text-white text-[10px] uppercase font-bold tracking-wider rounded-md animate-in zoom-in duration-300">
-                                    Activo
+                            {/* Fake background image layer matching the vibe of the mockups */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-800/20 z-0" />
+                            <div className={`absolute inset-0 bg-emerald-500/5 transition-opacity duration-300 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+
+                            {/* Active Badge */}
+                            <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
+                                <div className="px-3 py-1 bg-emerald-500 text-white text-[11px] font-bold rounded-full flex items-center gap-1 shadow-lg">
+                                    <CheckCircle2 className="w-3 h-3" /> Activo
                                 </div>
-                            )}
-                            <CardHeader className="text-center pb-2 pt-8">
-                                <Icon className={`w-12 h-12 mx-auto mb-4 transition-transform duration-500 ${isSelected ? "text-orange-400 scale-110" : "text-zinc-500 group-hover:text-zinc-300 group-hover:scale-110"}`} />
-                                <CardTitle className={isSelected ? "text-orange-100" : "text-zinc-200"}>{format.title}</CardTitle>
-                                <CardDescription className={isSelected ? "text-orange-200/70" : ""}>{format.desc}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-center pb-8">
-                                <p className={`text-sm mb-6 mt-2 ${isSelected ? "text-orange-100/80" : "text-zinc-400"}`}>
-                                    {format.text}
-                                </p>
-                                <div className={`w-full py-2 rounded-md text-sm font-medium transition-all duration-300 ${isSelected
-                                        ? "bg-orange-600 text-white shadow-[0_0_15px_rgba(249,115,22,0.3)]"
-                                        : "bg-white/5 text-zinc-400 border border-white/10 group-hover:bg-white/10 group-hover:text-zinc-200"
-                                    }`}>
-                                    {isSelected ? "Seleccionado" : "Seleccionar"}
+                            </div>
+
+                            <CardContent className="relative z-10 p-6 flex flex-col gap-4 mt-auto">
+                                <div className="space-y-2">
+                                    <h3 className={`text-xl font-extrabold tracking-tight leading-tight ${isSelected ? "text-emerald-50" : "text-zinc-100"}`}>
+                                        {format.title}
+                                    </h3>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        {format.desc}
+                                    </p>
+                                </div>
+
+                                <div className="pt-4 border-t border-white/5">
+                                    <div className="text-[10px] font-medium text-emerald-500/70 tracking-widest uppercase mb-2 flex items-center gap-1.5">
+                                        <div className="w-1 h-3 bg-emerald-500/50 rounded-full" />
+                                        INSTRUCCIÓN PARA IA
+                                    </div>
+                                    <p className="text-xs text-zinc-600 font-mono line-clamp-2">
+                                        "{format.title.toLowerCase()} style ad format for conversion. Highly detailed."
+                                    </p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -184,12 +137,16 @@ export default function FormatoCreativoPage() {
                 })}
             </div>
 
-            <div className="mt-4 p-6 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-200 text-sm flex gap-4 items-start">
-                <LayoutTemplate className="w-6 h-6 shrink-0 mt-0.5" />
-                <p className="leading-relaxed">
-                    <strong>Nota sobre formatos:</strong> Elegir múltiples formatos a la vez consumirá más créditos durante la generación en "La Fábrica",
-                    pues la IA tendrá que renderizar variaciones de cada imagen para adaptarlas a las diferentes dimensiones. Te recomendamos empezar con el formato más relevante para tu campaña actual.
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 pt-6 border-t border-white/10">
+                <p className="text-sm text-amber-500/80 flex items-center gap-2">
+                    <span className="text-amber-500">⚠️</span> Solo los estilos marcados como <strong>Activos</strong> serán utilizados.
                 </p>
+                <Button
+                    onClick={handleSave}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base"
+                >
+                    Siguiente: Estilo Visual <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
             </div>
         </div>
     );
