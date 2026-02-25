@@ -170,20 +170,27 @@ export default function IdentidadVisualPage() {
             }
 
             if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
+                // Get the authenticated user
+                const { data: { user } } = await supabase.auth.getUser();
+
                 const { error: dbError } = await supabase
                     .from('brand_identity')
                     .upsert({
                         project_id: activeProjectId,
+                        user_id: user?.id, // CRITICAL FIX FOR RLS
                         logo_url: finalLogoUrl || null,
                         primary_color: primaryColor,
                         secondary_color: secondaryColor,
                         font: finalTypography,
-                        slogan: slogan,
+                        slogan: includeSlogan ? slogan : "", // Only save slogan if enabled
                         include_slogan: includeSlogan
                     }, { onConflict: 'project_id' });
 
                 if (dbError) {
-                    console.warn("No se pudo insertar en la tabla brand_identity:", dbError);
+                    console.error("No se pudo insertar en la tabla brand_identity:", dbError);
+                    toast.error(`Error guardando datos en base de datos: ${dbError.message}`);
+                    setIsSaving(false);
+                    return; // Stop execution on DB error so they don't get the success toast
                 }
             }
 
@@ -428,11 +435,8 @@ export default function IdentidadVisualPage() {
                     <div className="pt-8 flex justify-end">
                         <Button
                             onClick={handleSave}
-                            disabled={isSaving || !typography}
-                            className={`font-semibold shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all px-8 py-6 rounded-full text-base ${!typography
-                                    ? "bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/10"
-                                    : "bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white border-0"
-                                }`}
+                            disabled={isSaving}
+                            className="font-semibold shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all px-8 py-6 rounded-full text-base bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white border-0"
                         >
                             {isSaving ? (
                                 <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Guardando Identidad...</span>
