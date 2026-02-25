@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils";
 
 const routes = [
   {
-    label: "Dashboard",
+    label: "Inicio",
     icon: LayoutDashboard,
-    href: "/dashboard", // Or wherever the main dashboard is
+    href: "/", // Main dashboard route
     color: "text-sky-500",
   },
   {
@@ -69,16 +69,16 @@ export const Sidebar = () => {
   const pathname = usePathname();
 
   return (
-    <div className="space-y-4 py-4 flex flex-col h-full bg-[#111827] text-white">
-      <div className="px-3 py-2 flex-1">
-        <Link href="/dashboard" className="flex items-center pl-3 mb-14">
+    <div className="space-y-4 py-4 flex flex-col h-full bg-transparent text-foreground">
+      <div className="px-3 py-2 flex-1 relative z-10">
+        <Link href="/" className="flex items-center pl-3 mb-14 transition-opacity hover:opacity-80">
           <div className="relative w-8 h-8 mr-4">
-            {/* You can place a logo here */}
-            <div className="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center font-bold text-xl">
+            <div className="absolute -inset-1 bg-gradient-to-r from-primary to-fuchsia-600 rounded-lg blur opacity-50"></div>
+            <div className="relative w-8 h-8 bg-gradient-to-tr from-violet-600 to-fuchsia-600 rounded-lg flex items-center justify-center font-bold text-xl text-white shadow-xl shadow-primary/20">
               A
             </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
             AngleMaster
           </h1>
         </Link>
@@ -88,12 +88,14 @@ export const Sidebar = () => {
               href={route.href}
               key={route.href}
               className={cn(
-                "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition",
-                pathname === route.href ? "text-white bg-white/10" : "text-zinc-400"
+                "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer rounded-lg transition-all duration-300",
+                pathname === route.href
+                  ? "text-primary bg-primary/10 shadow-[0_0_20px_rgba(124,58,237,0.15)] border border-primary/20"
+                  : "text-zinc-400 hover:text-foreground hover:bg-white/5"
               )}
             >
               <div className="flex items-center flex-1">
-                <route.icon className={cn("h-5 w-5 mr-3", route.color)} />
+                <route.icon className={cn("h-5 w-5 mr-3 transition-colors", pathname === route.href ? "text-primary" : route.color)} />
                 {route.label}
               </div>
             </Link>

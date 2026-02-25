@@ -71,7 +71,7 @@ export default function IdentidadVisualPage() {
     }
 
     return (
-        <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+        <div className="flex flex-col gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Identidad Visual</h1>
                 <p className="text-muted-foreground mt-2">
@@ -79,38 +79,40 @@ export default function IdentidadVisualPage() {
                 </p>
             </div>
 
-            <Card className="border-border shadow-sm">
-                <CardHeader>
+            <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-2xl overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-rose-500/5 pointer-events-none" />
+                <CardHeader className="relative z-10">
                     <CardTitle>Configuración de Marca</CardTitle>
                     <CardDescription>
                         Definir bien estos elementos asegura que los creativos generados sigan la misma línea visual.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative z-10">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 
                             {/* Logo Section */}
                             <div className="space-y-4">
                                 <FormLabel className="flex items-center gap-2">
-                                    <ImageIcon className="w-4 h-4" /> Logo Principal
+                                    <ImageIcon className="w-4 h-4 text-pink-400" /> Logo Principal
                                 </FormLabel>
                                 <div className="flex items-start gap-6">
                                     {/* Preview Area */}
-                                    <div className="h-32 w-32 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+                                    <div className="h-32 w-32 rounded-xl border-2 border-dashed border-white/20 flex items-center justify-center bg-white/5 overflow-hidden shrink-0 transition-all hover:bg-white/10 hover:border-pink-500/50 relative group">
                                         {logoPreview ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain p-2" />
                                         ) : (
-                                            <ImageIcon className="h-8 w-8 text-gray-400" />
+                                            <ImageIcon className="h-8 w-8 text-white/20 group-hover:text-pink-400/50 transition-colors" />
                                         )}
+                                        <div className="absolute inset-0 bg-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                                     </div>
 
                                     {/* Upload Controls */}
                                     <div className="space-y-3 flex-1">
-                                        <div className="flex items-center gap-4">
-                                            <Button variant="outline" type="button" className="relative cursor-pointer">
-                                                <UploadCloud className="mr-2 h-4 w-4" /> Subir Logo
+                                        <div className="flex flex-col gap-2">
+                                            <Button variant="outline" type="button" className="relative cursor-pointer w-fit bg-white/5 border-white/10 hover:bg-white/10 hover:text-white">
+                                                <UploadCloud className="mr-2 h-4 w-4 text-pink-400" /> Subir Logo
                                                 <input
                                                     type="file"
                                                     accept="image/*"
@@ -118,7 +120,7 @@ export default function IdentidadVisualPage() {
                                                     onChange={handleLogoUpload}
                                                 />
                                             </Button>
-                                            <span className="text-sm text-muted-foreground">Recomendado: Logo transparente en PNG o SVG.</span>
+                                            <span className="text-sm text-muted-foreground">Recomendado: Logo transparente en PNG o SVG. Max 5MB.</span>
                                         </div>
                                     </div>
                                 </div>
@@ -132,18 +134,20 @@ export default function IdentidadVisualPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Palette className="w-4 h-4" /> Color Principal
+                                                <Palette className="w-4 h-4 text-violet-400" /> Color Principal
                                             </FormLabel>
                                             <FormControl>
                                                 <div className="flex gap-3 items-center">
-                                                    <Input
-                                                        type="color"
-                                                        className="p-1 h-10 w-16 cursor-pointer"
-                                                        {...field}
-                                                    />
+                                                    <div className="relative rounded-md overflow-hidden h-10 w-16 border border-white/10 shrink-0">
+                                                        <input
+                                                            type="color"
+                                                            className="absolute -inset-2 w-[150%] h-[150%] cursor-pointer"
+                                                            {...field}
+                                                        />
+                                                    </div>
                                                     <Input
                                                         type="text"
-                                                        className="flex-1 font-mono uppercase"
+                                                        className="flex-1 font-mono uppercase bg-white/5 border-white/10 focus-visible:ring-violet-500"
                                                         {...field}
                                                     />
                                                 </div>
@@ -162,18 +166,20 @@ export default function IdentidadVisualPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Palette className="w-4 h-4 text-muted-foreground" /> Color Secundario
+                                                <Palette className="w-4 h-4 text-fuchsia-400" /> Color Secundario
                                             </FormLabel>
                                             <FormControl>
                                                 <div className="flex gap-3 items-center">
-                                                    <Input
-                                                        type="color"
-                                                        className="p-1 h-10 w-16 cursor-pointer"
-                                                        {...field}
-                                                    />
+                                                    <div className="relative rounded-md overflow-hidden h-10 w-16 border border-white/10 shrink-0">
+                                                        <input
+                                                            type="color"
+                                                            className="absolute -inset-2 w-[150%] h-[150%] cursor-pointer"
+                                                            {...field}
+                                                        />
+                                                    </div>
                                                     <Input
                                                         type="text"
-                                                        className="flex-1 font-mono uppercase"
+                                                        className="flex-1 font-mono uppercase bg-white/5 border-white/10 focus-visible:ring-fuchsia-500"
                                                         {...field}
                                                     />
                                                 </div>
@@ -194,15 +200,15 @@ export default function IdentidadVisualPage() {
                                 render={({ field }) => (
                                     <FormItem className="max-w-md">
                                         <FormLabel className="flex items-center gap-2">
-                                            <Type className="w-4 h-4" /> Tipografía Principal
+                                            <Type className="w-4 h-4 text-sky-400" /> Tipografía Principal
                                         </FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
-                                                <SelectTrigger>
+                                                <SelectTrigger className="bg-white/5 border-white/10 focus:ring-sky-500">
                                                     <SelectValue placeholder="Selecciona una fuente" />
                                                 </SelectTrigger>
                                             </FormControl>
-                                            <SelectContent>
+                                            <SelectContent className="bg-zinc-950 border-white/10">
                                                 <SelectItem value="inter">Inter (Moderna y Limpia)</SelectItem>
                                                 <SelectItem value="roboto">Roboto (Versátil e Institucional)</SelectItem>
                                                 <SelectItem value="playfair">Playfair Display (Elegante y Clásica)</SelectItem>
@@ -219,7 +225,7 @@ export default function IdentidadVisualPage() {
                             />
 
                             <div className="flex justify-end pt-4">
-                                <Button type="submit" className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white">
+                                <Button type="submit" className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:shadow-[0_0_25px_rgba(236,72,153,0.5)] transition-all duration-300">
                                     Guardar Identidad Visual
                                 </Button>
                             </div>

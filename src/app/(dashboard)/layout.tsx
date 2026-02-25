@@ -7,13 +7,13 @@ const DashboardLayout = ({
     children: React.ReactNode;
 }) => {
     return (
-        <div className="h-full relative antialiased text-slate-900 bg-slate-50 min-h-screen">
-            <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-80 bg-gray-900">
+        <div className="h-full relative antialiased bg-background text-foreground min-h-screen">
+            <div className="hidden h-full md:flex md:w-72 md:flex-col md:fixed md:inset-y-0 z-80 border-r border-border/40 bg-zinc-950/80 backdrop-blur-xl">
                 <Sidebar />
             </div>
-            <main className="md:pl-72 h-full">
+            <main className="md:pl-72 h-full flex flex-col">
                 <Topbar />
-                <div className="p-8">
+                <div className="p-8 flex-1">
                     {children}
                 </div>
             </main>

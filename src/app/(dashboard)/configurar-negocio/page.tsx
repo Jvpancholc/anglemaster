@@ -54,7 +54,7 @@ export default function ConfigurarNegocioPage() {
     }
 
     return (
-        <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+        <div className="flex flex-col gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Configurar Negocio</h1>
                 <p className="text-muted-foreground mt-2">
@@ -62,14 +62,15 @@ export default function ConfigurarNegocioPage() {
                 </p>
             </div>
 
-            <Card className="border-border shadow-sm">
-                <CardHeader>
+            <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-2xl overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 pointer-events-none" />
+                <CardHeader className="relative z-10">
                     <CardTitle>Información General</CardTitle>
                     <CardDescription>
                         Estos datos ayudarán a la IA a entender mejor tu marca y tus productos.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative z-10">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -79,10 +80,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Store className="w-4 h-4" /> Nombre del Negocio
+                                                <Store className="w-4 h-4 text-violet-400" /> Nombre del Negocio
                                             </FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Ej. AngleMaster Store" {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-violet-500" placeholder="Ej. AngleMaster Store" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -94,10 +95,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <LinkIcon className="w-4 h-4" /> URL de Shopify
+                                                <LinkIcon className="w-4 h-4 text-fuchsia-400" /> URL de Shopify
                                             </FormLabel>
                                             <FormControl>
-                                                <Input placeholder="https://mitienda.myshopify.com" {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-fuchsia-500" placeholder="https://mitienda.myshopify.com" {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -112,10 +113,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Target className="w-4 h-4" /> Nicho o Categoría
+                                                <Target className="w-4 h-4 text-sky-400" /> Nicho o Categoría
                                             </FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Ej. Ropa deportiva, Tecnología, Salud..." {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-sky-500" placeholder="Ej. Ropa deportiva, Tecnología, Salud..." {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -127,10 +128,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <MousePointerClick className="w-4 h-4" /> CTA Principal (Opcional)
+                                                <MousePointerClick className="w-4 h-4 text-emerald-400" /> CTA Principal <span className="text-muted-foreground font-normal">(Opcional)</span>
                                             </FormLabel>
                                             <FormControl>
-                                                <Input placeholder="Ej. Compra ahora, Descubre más" {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-emerald-500" placeholder="Ej. Compra ahora, Descubre más" {...field} />
                                             </FormControl>
                                             <FormDescription>
                                                 El llamado a la acción que más usas.
@@ -147,12 +148,12 @@ export default function ConfigurarNegocioPage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="flex items-center gap-2">
-                                            <AlignLeft className="w-4 h-4" /> Descripción del Producto o Servicio
+                                            <AlignLeft className="w-4 h-4 text-orange-400" /> Descripción del Producto o Servicio
                                         </FormLabel>
                                         <FormControl>
                                             <Textarea
                                                 placeholder="Describe qué vendes, cuáles son sus beneficios principales y qué problema resuelve para tu cliente ideal."
-                                                className="resize-none h-32"
+                                                className="resize-none h-32 bg-white/5 border-white/10 focus-visible:ring-orange-500"
                                                 {...field}
                                             />
                                         </FormControl>
@@ -165,7 +166,7 @@ export default function ConfigurarNegocioPage() {
                             />
 
                             <div className="flex justify-end pt-4">
-                                <Button type="submit" className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white">
+                                <Button type="submit" className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_25px_rgba(124,58,237,0.5)] transition-all duration-300">
                                     Guardar Configuración
                                 </Button>
                             </div>
