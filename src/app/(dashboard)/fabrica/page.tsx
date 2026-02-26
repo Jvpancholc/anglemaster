@@ -187,16 +187,18 @@ export default function FabricaCreativaPage() {
     }, [activeProjectId, projects, userId]);
 
     const handleGenerate = async () => {
-        if (!settings?.geminiKey || settings.geminiKey.trim() === "") {
-            setIsApiKeyModalOpen(true);
+        setIsApiKeyModalOpen(false); // Make sure model doesn't block
+
+        if (angles.length === 0) {
+            toast.error("No hay ángulos disponibles.");
             return;
         }
 
-        if (!selectedAngleId) return;
+        const countPerAngle = parseInt(variantCount) || 1;
+        const totalImagesToGenerate = countPerAngle * angles.length;
 
-        const count = parseInt(variantCount) || 1;
-        if (generationsLeft !== 'Ilimitado' && generationsLeft < count) {
-            toast.error("Límite diario excedido. Actualiza tu plan o añade tu propia API Key en Preferencias.");
+        if (generationsLeft !== 'Ilimitado' && typeof generationsLeft === 'number' && generationsLeft < totalImagesToGenerate) {
+            toast.error(`Límite diario insuficiente para generar ${totalImagesToGenerate} imágenes. Actualiza tu plan o añade API keys en Preferencias.`);
             return;
         }
 
@@ -204,57 +206,71 @@ export default function FabricaCreativaPage() {
         setGeneratedImages([]);
 
         try {
-            const angleObj = angles.find(a => a.id === selectedAngleId);
-
             const token = await getToken({ template: 'supabase' });
+            if (!token) throw new Error("No autenticado en Supabase");
 
-            const payload = {
-                projectId: activeProjectId,
-                angleId: selectedAngleId,
-                variantCount,
-                userId: user?.id,
-                settings,
-                context: {
-                    ...projectContext,
-                    angleText: angleObj?.text
-                },
-                freeStyle: generationStyle === "free",
-                generationModel,
-                supabaseToken: token // Pasado en el body para evitar que Clerk Middleware devuelva 307 Redirect Error
-            };
+            toast.loading(`Generando para ${angles.length} ángulo(s)...`, { id: 'genToast' });
 
-            const res = await fetch("/api/generate-creatives", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
+            const generationPromises = angles.map(async (angleObj) => {
+                const payload = {
+                    projectId: activeProjectId,
+                    angleId: angleObj.id,
+                    variantCount,
+                    userId: user?.id,
+                    settings,
+                    context: {
+                        ...projectContext,
+                        angleText: angleObj.text
+                    },
+                    freeStyle: generationStyle === "free",
+                    generationModel,
+                    supabaseToken: token
+                };
+
+                const res = await fetch("/api/generate-creatives", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const responseText = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    console.error("Non-JSON:", responseText);
+                    throw new Error("El servidor devolvió un error inesperado.");
+                }
+
+                if (!res.ok || data.error) {
+                    throw new Error(data.error || "Error en la respuesta del servidor");
+                }
+                return data;
             });
 
-            const responseText = await res.text();
-            let data;
-            try {
-                data = JSON.parse(responseText);
-            } catch (e) {
-                console.error("Non-JSON response from server:", responseText.substring(0, 200));
-                throw new Error("El servidor devolvió un error inesperado. Por favor, revisa la consola para más detalles.");
-            }
+            const results = await Promise.all(generationPromises);
 
-            if (!res.ok || data.error) {
-                throw new Error(data.error || "Error en la respuesta del servidor");
-            }
+            let allCreativeIds: string[] = [];
+            let synchronousUrls: string[] = [];
 
-            // INICIAMOS POLLING (Cola Serverless)
-            if (data.queued && data.creativeIds) {
-                toast.success("Trabajo encolado. Generando en segundo plano...", { icon: '⏳' });
+            results.forEach(res => {
+                if (res.queued && res.creativeIds) {
+                    allCreativeIds = [...allCreativeIds, ...res.creativeIds];
+                } else if (res.images) {
+                    synchronousUrls = [...synchronousUrls, ...res.images];
+                }
+            });
+
+            if (allCreativeIds.length > 0) {
+                toast.loading(`Trabajos encolados. Generando las ${totalImagesToGenerate} imágenes finales...`, { id: 'genToast' });
 
                 let attempts = 0;
-                const maxAttempts = 60; // 3 minutos máximo (60 * 3s)
+                const maxAttempts = 60;
 
                 const pollInterval = setInterval(async () => {
                     attempts++;
                     try {
-                        const statusRes = await fetch(`/api/creatives/status?ids=${data.creativeIds.join(',')}`);
+                        const statusRes = await fetch(`/api/creatives/status?ids=${allCreativeIds.join(',')}`);
                         const statusData = await statusRes.json();
 
                         if (statusData.success && statusData.statuses) {
@@ -271,37 +287,35 @@ export default function FabricaCreativaPage() {
                                 setGeneratedImages(finalUrls);
 
                                 if (generationsLeft !== 'Ilimitado') {
-                                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - count : prev);
+                                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - totalImagesToGenerate : prev);
                                 }
 
                                 setIsGenerating(false);
-
-                                if (finalUrls.length > 0) {
-                                    toast.success("¡Creativos generados y cacheados exitosamente!", { icon: '🎨' });
-                                } else {
-                                    toast.error("Hubo un timeout o fallo en la generación asincrónica.");
-                                }
+                                toast.success("¡Creativos generados existosamente!", { id: 'genToast' });
+                                fetchSavedCreatives();
                             }
                         }
                     } catch (e) {
                         console.error("Polling error", e);
                     }
-                }, 3000); // 3 segundos
-            } else {
-                // Fallback por si devuelve imágenes de forma síncrona (mock)
-                setGeneratedImages(data.images || []);
+                }, 3000);
+            } else if (synchronousUrls.length > 0) {
+                setGeneratedImages(synchronousUrls);
                 if (generationsLeft !== 'Ilimitado') {
-                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - count : prev);
+                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - totalImagesToGenerate : prev);
                 }
                 setIsGenerating(false);
-                toast.success("Creativos generados existosamente.");
+                toast.success("Creativos generados existosamente.", { id: 'genToast' });
                 fetchSavedCreatives();
+            } else {
+                toast.dismiss('genToast');
+                setIsGenerating(false);
             }
 
         } catch (error: any) {
             console.error("Generación fallida:", error);
             setIsGenerating(false);
-            toast.error(error.message || "Error al conectar con la API de generación.");
+            toast.error(error.message || "Error al conectar con la API de generación.", { id: 'genToast' });
         }
     };
 
@@ -423,25 +437,20 @@ export default function FabricaCreativaPage() {
                     {/* LEFT CONTENT */}
                     <div className="flex-1 flex flex-col justify-between space-y-8">
                         <div>
-                            <span className="inline-block px-3 py-1 bg-white/5 border border-white/5 rounded-full text-[10px] text-zinc-400 font-bold tracking-wider mb-6">
-                                Ángulo Generado
-                            </span>
+                            <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 relative">
+                                <span className="absolute -top-3 left-6 inline-block px-3 py-1 bg-violet-600 border border-violet-500 rounded-full text-[10px] text-white font-bold tracking-wider">
+                                    {angles.length} ÁNGULO{angles.length > 1 ? 'S' : ''} SELECCIONADO{angles.length > 1 ? 'S' : ''}
+                                </span>
 
-                            {/* ANGLE SELECTOR */}
-                            <Select value={selectedAngleId} onValueChange={setSelectedAngleId}>
-                                <SelectTrigger className="w-full bg-transparent border-0 p-0 h-auto text-2xl md:text-3xl font-bold text-white mb-6 focus:ring-0 [&>svg]:hidden hover:opacity-80 transition-opacity">
-                                    <h2 className="text-left leading-tight truncate-multiline">
-                                        {angles.find(a => a.id === selectedAngleId)?.text || "Escribe tu gancho aquí..."}
-                                    </h2>
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10 max-h-60">
-                                    {angles.map((a) => (
-                                        <SelectItem key={a.id} value={a.id} className="py-3 cursor-pointer">
-                                            <span className="line-clamp-2">{a.text}</span>
-                                        </SelectItem>
+                                <div className="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                    {angles.map((a, i) => (
+                                        <div key={a.id} className="flex gap-3 text-sm text-zinc-300 items-start">
+                                            <div className="text-zinc-600 font-bold shrink-0 mt-0.5">{i + 1}.</div>
+                                            <p className="line-clamp-2 leading-relaxed">&ldquo;{a.text}&rdquo;</p>
+                                        </div>
                                     ))}
-                                </SelectContent>
-                            </Select>
+                                </div>
+                            </div>
 
                             <div className="bg-[#050505] border border-white/5 rounded-2xl p-6 space-y-6">
                                 <div>
@@ -521,15 +530,34 @@ export default function FabricaCreativaPage() {
                     </div>
 
                     {/* RIGHT CONTENT (IMAGE PLACEHOLDER/RESULT) */}
-                    <div className="w-full md:w-[400px] shrink-0 flex flex-col items-center justify-center">
+                    <div className="w-full md:w-[400px] shrink-0 flex flex-col items-center justify-center relative">
                         {generatedImages.length > 0 ? (
-                            <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 group">
-                                <img src={generatedImages[0]} crossOrigin="anonymous" className="w-full h-auto" />
+                            <div
+                                className={`relative w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group bg-zinc-900 transition-all duration-700 ease-in-out`}
+                                style={{
+                                    aspectRatio: generationFormat === '9:16' ? '9/16' : generationFormat === '16:9' ? '16/9' : generationFormat === '1:1' ? '1/1' : '4/5'
+                                }}
+                            >
+                                <img src={generatedImages[0]} crossOrigin="anonymous" className="w-full h-full object-cover transition-transform duration-700 ease-in-out" />
+                                {generatedImages.length > 1 && (
+                                    <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-xs font-bold text-white shadow-xl">
+                                        + {generatedImages.length - 1} variantes
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <div className={`w-full ${generationFormat === '9:16' ? 'aspect-[9/16]' : generationFormat === '16:9' ? 'aspect-[16/9]' : generationFormat === '1:1' ? 'aspect-square' : 'aspect-[4/5]'} rounded-3xl border-2 border-dashed border-white/5 bg-white/[0.02] flex flex-col items-center justify-center text-zinc-600 transition-all`}>
-                                <ImageIcon className="w-10 h-10 mb-4 opacity-50" />
-                                <span className="text-sm font-medium">Imagen pendiente</span>
+                            <div
+                                className={`w-full rounded-3xl border border-white/5 bg-gradient-to-br from-white/[0.03] to-white/[0.01] flex flex-col items-center justify-center text-zinc-500 shadow-inner group transition-all duration-700 ease-in-out`}
+                                style={{
+                                    aspectRatio: generationFormat === '9:16' ? '9/16' : generationFormat === '16:9' ? '16/9' : generationFormat === '1:1' ? '1/1' : '4/5'
+                                }}
+                            >
+                                <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:32px_32px] pointer-events-none rounded-3xl" />
+                                <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 shadow-xl">
+                                    <ImageIcon strokeWidth={1} className="w-8 h-8 opacity-50 text-cyan-500" />
+                                </div>
+                                <span className="text-sm font-semibold tracking-wide text-zinc-400">Previsualización Base</span>
+                                <span className="text-[10px] uppercase font-bold text-zinc-600 mt-2 tracking-widest bg-white/5 px-2 py-1 rounded-full">{generationFormat}</span>
                             </div>
                         )}
                     </div>

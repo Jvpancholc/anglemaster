@@ -50,9 +50,6 @@ export default function EstiloVisualPage() {
     const { activeProjectId, projects, updateProject } = useProjectStore();
     const [mounted, setMounted] = useState(false);
     const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
-
-    const [styleReferenceFiles, setStyleReferenceFiles] = useState<File[]>([]);
-    const [faceImageFiles, setFaceImageFiles] = useState<File[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -68,95 +65,20 @@ export default function EstiloVisualPage() {
         }
     }, [activeProjectId, projects, router]);
 
-    const handleStyleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const newFiles = Array.from(e.target.files);
-            setStyleReferenceFiles(prev => {
-                const combined = [...prev, ...newFiles];
-                if (combined.length > 2) {
-                    toast.warning("Solo puedes subir un máximo de 2 referencias. Se han descartado algunas.");
-                    return combined.slice(0, 2);
-                }
-                return combined;
-            });
-        }
-    };
 
-    const handleFaceFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const newFiles = Array.from(e.target.files);
-            setFaceImageFiles(prev => {
-                const combined = [...prev, ...newFiles];
-                if (combined.length > 4) {
-                    toast.warning("Solo puedes subir un máximo de 4 rostros. Se han descartado algunos.");
-                    return combined.slice(0, 4);
-                }
-                return combined;
-            });
-        }
-    };
 
     const handleSave = async () => {
         if (!activeProjectId || !selectedStyle) return;
         setIsSaving(true);
-        const toastId = toast.loading("Guardando estilo visual y recursos...");
+        const toastId = toast.loading("Guardando estilo visual...");
 
         try {
-            const token = await getToken({ template: 'supabase' });
-            if (!token) throw new Error("No autenticado");
-            const supabaseAuth = createClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                { global: { headers: { Authorization: `Bearer ${token}` } } }
-            );
-
-            // Upload styles
-            const uploadedStyleUrls: string[] = [];
-            for (const file of styleReferenceFiles) {
-                const fileExt = file.name.split(".").pop();
-                const fileName = `${activeProjectId}/${Date.now()}_style_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const { error: uploadError } = await supabaseAuth.storage
-                    .from("style-references")
-                    .upload(fileName, file, { upsert: true });
-
-                if (!uploadError) {
-                    const { data } = supabaseAuth.storage.from("style-references").getPublicUrl(fileName);
-                    uploadedStyleUrls.push(data.publicUrl);
-                } else {
-                    console.error("Error subiendo referencia de estilo:", uploadError);
-                }
-            }
-
-            // Upload faces
-            const uploadedFaceUrls: string[] = [];
-            for (const file of faceImageFiles) {
-                const fileExt = file.name.split(".").pop();
-                const fileName = `${activeProjectId}/${Date.now()}_face_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const { error: uploadError } = await supabaseAuth.storage
-                    .from("face-images")
-                    .upload(fileName, file, { upsert: true });
-
-                if (!uploadError) {
-                    const { data } = supabaseAuth.storage.from("face-images").getPublicUrl(fileName);
-                    uploadedFaceUrls.push(data.publicUrl);
-                } else {
-                    console.error("Error subiendo foto de rostro:", uploadError);
-                }
-            }
-
-            const project = projects.find(p => p.id === activeProjectId);
-
             updateProject(activeProjectId, {
                 visualStyle: selectedStyle,
-                identity: {
-                    ...(project?.identity || {} as any),
-                    styleReferences: uploadedStyleUrls.length > 0 ? uploadedStyleUrls : project?.identity.styleReferences,
-                    faceImages: uploadedFaceUrls.length > 0 ? uploadedFaceUrls : project?.identity.faceImages,
-                }
             });
 
             toast.success("Estilo visual guardado.", { id: toastId });
-            router.push("/analisis-ia");
+            router.push("/similitud-ia");
         } catch (error: any) {
             console.error(error);
             toast.error(error.message || "Error al guardar estilo visual", { id: toastId });
@@ -173,13 +95,13 @@ export default function EstiloVisualPage() {
                 <div className="text-center sm:text-left flex flex-col items-center sm:items-start text-white">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400 font-medium mb-4">
                         <Eye className="w-3.5 h-3.5" />
-                        Fase 2: Espionaje Visual
+                        Fase 4: Estética Central
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4 text-white">
-                        Espionaje <span className="text-indigo-400">Visual</span>
+                        Estilo <span className="text-emerald-400">Visual</span>
                     </h1>
                     <p className="text-zinc-400 text-sm sm:text-base max-w-xl leading-relaxed">
-                        Sube contenido que la IA debe analizar. Entre mejor la referencia, mejor el resultado final. Combina un estilo base con tus imágenes de competencia y rostros.
+                        Selecciona el estilo base preferido sobre el que se basará la generación final de creativos.
                     </p>
                 </div>
             </div>
@@ -229,103 +151,7 @@ export default function EstiloVisualPage() {
                 })}
             </div>
 
-            {/* Espionaje AI Uploads */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
-                {/* Competence References */}
-                <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden group hover:border-white/10 transition-colors">
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <ImagePlus className="w-5 h-5 text-pink-400" />
-                            <h3 className="font-bold text-white text-lg">Referencias de Competencia</h3>
-                        </div>
-                        <p className="text-xs text-zinc-500">
-                            Sube anuncios, posts o artes visuales de tu competencia o inspiración. La IA calcará su composición visual.
-                        </p>
-                    </div>
-
-                    <div
-                        onClick={() => document.getElementById("style-upload")?.click()}
-                        className="mt-2 border-2 border-dashed border-white/10 p-8 rounded-xl bg-black/20 hover:bg-white/5 cursor-pointer transition-colors text-center flex flex-col items-center justify-center"
-                    >
-                        <UploadCloud className="w-8 h-8 text-zinc-600 mb-3" />
-                        <span className="text-sm font-medium text-zinc-400">Click para subir (Máx 2)</span>
-                        <input
-                            id="style-upload"
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleStyleFilesChange}
-                        />
-                    </div>
-
-                    {styleReferenceFiles.length > 0 && (
-                        <div className="flex flex-wrap gap-3 mt-2">
-                            {styleReferenceFiles.map((f, idx) => (
-                                <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group/img">
-                                    <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
-                                    <button onClick={(e) => {
-                                        e.stopPropagation();
-                                        setStyleReferenceFiles(prev => prev.filter((_, i) => i !== idx));
-                                    }} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
-                                        Quitar
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Faces References */}
-                <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden group hover:border-white/10 transition-colors">
-                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <User className="w-5 h-5 text-sky-400" />
-                            <h3 className="font-bold text-white text-lg">Fotos de Rostro <span className="text-zinc-500 font-normal text-sm">(Opcional)</span></h3>
-                        </div>
-                        <p className="text-xs text-zinc-500">
-                            ¿Quieres que la IA use tu rostro o el de tu cliente? Sube 1 a 4 fotos claras, mirando al frente, con buena iluminación.
-                        </p>
-                    </div>
-
-                    <div
-                        onClick={() => document.getElementById("face-upload")?.click()}
-                        className="mt-2 border-2 border-dashed border-white/10 p-8 rounded-xl bg-black/20 hover:bg-white/5 cursor-pointer transition-colors text-center flex flex-col items-center justify-center"
-                    >
-                        <UploadCloud className="w-8 h-8 text-zinc-600 mb-3" />
-                        <span className="text-sm font-medium text-zinc-400">Click para subir (Máx 4)</span>
-                        <input
-                            id="face-upload"
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleFaceFilesChange}
-                        />
-                    </div>
-
-                    {faceImageFiles.length > 0 && (
-                        <div className="flex flex-wrap gap-3 mt-2">
-                            {faceImageFiles.map((f, idx) => (
-                                <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group/img">
-                                    <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
-                                    <button onClick={(e) => {
-                                        e.stopPropagation();
-                                        setFaceImageFiles(prev => prev.filter((_, i) => i !== idx));
-                                    }} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
-                                        Quitar
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
 
             <div className="sticky bottom-6 mt-4 p-4 rounded-2xl bg-[#111116] border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xl z-10 w-full">
                 <div className="text-sm text-zinc-400 flex items-center gap-2 px-2">
@@ -339,6 +165,6 @@ export default function EstiloVisualPage() {
                     {isSaving ? "Guardando y Subiendo..." : "Guardar Referencias y Continuar"}
                 </Button>
             </div>
-        </div>
+        </div >
     );
 }

@@ -47,6 +47,12 @@ const routes = [
     color: "text-emerald-500",
   },
   {
+    label: "Similitud IA",
+    icon: ImageIcon,
+    href: "/similitud-ia",
+    color: "text-sky-400",
+  },
+  {
     label: "Análisis IA",
     icon: BrainCircuit,
     href: "/analisis-ia",

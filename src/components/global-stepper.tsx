@@ -9,9 +9,10 @@ const STEPS = [
     { id: "/identidad-visual", label: "Identidad", stepIndex: 2 },
     { id: "/formato-creativo", label: "Formato", stepIndex: 3 },
     { id: "/estilo-visual", label: "Estilo Visual", stepIndex: 4 },
-    { id: "/analisis-ia", label: "Análisis IA", stepIndex: 5 },
-    { id: "/angulos", label: "Ángulos", stepIndex: 6 },
-    { id: "/fabrica", label: "Fábrica", stepIndex: 7 },
+    { id: "/similitud-ia", label: "Similitud IA", stepIndex: 5 },
+    { id: "/analisis-ia", label: "Análisis IA", stepIndex: 6 },
+    { id: "/angulos", label: "Ángulos", stepIndex: 7 },
+    { id: "/fabrica", label: "Fábrica", stepIndex: 8 },
 ];
 
 export function GlobalStepper() {
