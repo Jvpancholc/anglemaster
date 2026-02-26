@@ -3,13 +3,22 @@ import Replicate from "replicate";
 import { createClient } from "@supabase/supabase-js";
 import { Client as QStashClient } from "@upstash/qstash";
 
-// Initialize Supabase. We need the service role key to bypass RLS and upload to storage from backend if necessary,
-// or just standard anon key if bucket is public, but let's assume we have what we need.
+// Initialize Supabase variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(req: Request) {
+    // Si la llamada viene del frontend, traemos el token de Clerk. Si viene de Qstash webhook, usamos el service key.
+    const authHeader = req.headers.get('authorization');
+    let supabase: any;
+    if (authHeader) {
+        supabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+            global: { headers: { Authorization: authHeader } }
+        });
+    } else {
+        supabase = createClient(supabaseUrl, supabaseServiceKey);
+    }
+
     try {
         const body = await req.json();
         const { projectId, angleId, numVariants, context, settings, userId } = body;
@@ -133,7 +142,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Failed to initialize generation queue" }, { status: 500 });
         }
 
-        const creativeIds = insertedCreatives.map(c => c.id);
+        const creativeIds = insertedCreatives.map((c: any) => c.id);
 
         const payload = {
             creativeIds,

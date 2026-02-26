@@ -142,11 +142,11 @@ export default function FabricaCreativaPage() {
             const angleObj = angles.find(a => a.id === selectedAngleId);
 
             const payload = {
-                projectId: activeProjectId || "demo-project",
-                userId,
+                projectId: activeProjectId,
                 angleId: selectedAngleId,
-                numVariants: variantCount,
-                settings, // Pass global settings (API Keys)
+                variantCount,
+                userId: user?.id,
+                settings,
                 context: {
                     ...projectContext,
                     angleText: angleObj?.text
@@ -154,9 +154,14 @@ export default function FabricaCreativaPage() {
                 freeStyle: generationStyle === "free"
             };
 
+            const token = await getToken({ template: 'supabase' });
+
             const res = await fetch("/api/generate-creatives", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify(payload)
             });
 

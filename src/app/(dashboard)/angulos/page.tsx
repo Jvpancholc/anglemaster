@@ -43,7 +43,13 @@ export default function AngulosPage() {
         const savedAngles = localStorage.getItem("selectedAngles");
         if (savedAngles) {
             try {
-                setAngles(JSON.parse(savedAngles));
+                let parsed = JSON.parse(savedAngles);
+                // Limpieza retroactiva para los que quedaron cacheados con prefijo
+                parsed = parsed.map((a: any) => ({
+                    ...a,
+                    text: a.text.replace(/^【.*?】\s*:\s*/, '').replace(/^\[.*?\]\s*:\s*/, '').trim()
+                }));
+                setAngles(parsed);
             } catch (e) {
                 console.error("Error parsing saved angles", e);
             }
