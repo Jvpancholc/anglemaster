@@ -179,7 +179,7 @@ export default function IdentidadVisualPage() {
                 slogan: slogan,
                 include_slogan: includeSlogan,
                 style_references: uploadedStyleUrls,
-                face_images: uploadedFaceUrls
+                // face_images: uploadedFaceUrls // Requiere columna 'face_images' en base de datos
             };
 
             const { error } = await supabaseAuth

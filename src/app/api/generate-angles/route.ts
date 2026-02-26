@@ -46,35 +46,40 @@ export async function POST(req: Request) {
 
         if (outputLanguage === "Inglés") {
             mockGeneratedAngles = [
-                `【Direct Pain Angle】: The exact method to stop bleeding money with ${analysis.product || 'this product'}.`,
-                `【Time Saving Angle】: How to reclaim 10 hours a week applying the ${analysis.product || 'our solution'} system.`,
-                `【Aspirational Angle】: The secret your competition doesn't want you to know about client retention.`,
-                `【Authority Angle】: Why 90% of entrepreneurs fail in the first 5 months and how to avoid it.`,
-                `【Counter-intuitive Angle】: From zero to expert: we transform the learning curve into a straight line to conversion.`,
-                `【Fear of Missing Out Angle】: Why the traditional method is making you lose money without realizing it.`,
-                `【Immediate Solution Angle】: Discover how to triple your leads without increasing your ad budget.`,
-                `【Success Story Angle】: How a newbie made a 5-figure income using exactly this promise: "${analysis.promise || 'our guarantee'}".`,
-                `【Curiosity Angle】: The golden rule of copywriting that no one tells you, and it's included right here.`,
-                `【Pragmatic Angle】: Cut the nonsense and apply our Unique Mechanism: ${analysis.ums || 'disruptive tech'}.`
+                `The exact method to stop bleeding money with ${analysis.product || 'this product'}.`,
+                `How to reclaim 10 hours a week applying the ${analysis.product || 'our solution'} system.`,
+                `The secret your competition doesn't want you to know about client retention.`,
+                `Why 90% of entrepreneurs fail in the first 5 months and how to avoid it.`,
+                `From zero to expert: we transform the learning curve into a straight line to conversion.`,
+                `Why the traditional method is making you lose money without realizing it.`,
+                `Discover how to triple your leads without increasing your ad budget.`,
+                `How a newbie made a 5-figure income using exactly this promise: "${analysis.promise || 'our guarantee'}".`,
+                `The golden rule of copywriting that no one tells you, and it's included right here.`,
+                `Cut the nonsense and apply our Unique Mechanism: ${analysis.ums || 'disruptive tech'}.`
             ];
         } else {
             mockGeneratedAngles = [
-                `【Ángulo de Dolor Directo】: El método exacto para dejar de perder dinero con ${analysis.product || 'este producto'}.`,
-                `【Ángulo de Ahorro de Tiempo】: Cómo recuperar 10 horas semanales aplicando el sistema de ${analysis.product || 'nuestra solución'}.`,
-                `【Ángulo Aspiracional】: El secreto que tu competencia no quiere que sepas sobre retención de clientes.`,
-                `【Ángulo de Autoridad】: Por qué el 90% de los emprendedores fallan en los primeros 5 meses y cómo evitarlo.`,
-                `【Ángulo Contraintuitivo】: De cero a experto: transformamos la curva de aprendizaje en una línea recta de conversión.`,
-                `【Ángulo de Miedo a Perder】: Por qué el método tradicional te está haciendo perder dinero sin darte cuenta.`,
-                `【Ángulo de Solución Inmediata】: Descubre cómo triplicar tus leads sin aumentar el presupuesto en anuncios.`,
-                `【Ángulo Caso de Éxito】: Cómo un novato facturó 5 cifras usando exactamente esta promesa: "${analysis.promise || 'nuestra garantía'}".`,
-                `【Ángulo de Curiosidad】: La regla de oro del copywriting que nadie te cuenta, y que viene incluida en esto.`,
-                `【Ángulo Pragmático】: Corta las tonterías y aplica nuestro Mecanismo Único: ${analysis.ums || 'tecnología disruptiva'}.`
+                `El método exacto para dejar de perder dinero con ${analysis.product || 'este producto'}.`,
+                `Cómo recuperar 10 horas semanales aplicando el sistema de ${analysis.product || 'nuestra solución'}.`,
+                `El secreto que tu competencia no quiere que sepas sobre retención de clientes.`,
+                `Por qué el 90% de los emprendedores fallan en los primeros 5 meses y cómo evitarlo.`,
+                `De cero a experto: transformamos la curva de aprendizaje en una línea recta de conversión.`,
+                `Por qué el método tradicional te está haciendo perder dinero sin darte cuenta.`,
+                `Descubre cómo triplicar tus leads sin aumentar el presupuesto en anuncios.`,
+                `Cómo un novato facturó 5 cifras usando exactamente esta promesa: "${analysis.promise || 'nuestra garantía'}".`,
+                `La regla de oro del copywriting que nadie te cuenta, y que viene incluida en esto.`,
+                `Corta las tonterías y aplica nuestro Mecanismo Único: ${analysis.ums || 'tecnología disruptiva'}.`
             ];
         }
 
+        // Limpiamos cualquier prefijo tipo 【Texto】: u [Texto]: que la IA pudiera generar en el futuro
+        const cleanedAngles = mockGeneratedAngles.map(angle => {
+            return angle.replace(/^【.*?】\s*:\s*/, '').replace(/^\[.*?\]\s*:\s*/, '').trim();
+        });
+
         return NextResponse.json({
             success: true,
-            angles: mockGeneratedAngles
+            angles: cleanedAngles
         });
 
     } catch (error: any) {

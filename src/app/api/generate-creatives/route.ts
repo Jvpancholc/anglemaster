@@ -119,6 +119,7 @@ export async function POST(req: Request) {
             user_id: userId || 'anonymous',
             angle_id: angleId,
             prompt: prompt,
+            image_url: "pending", // Satisface el constraint NOT NULL temporalmente
             metadata: { status: "pending", createdAt: new Date().toISOString() }
         }));
 
