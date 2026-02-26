@@ -32,11 +32,26 @@ export function AppSync() {
                 );
 
                 // 1. Check API Keys first (Crucial for bypass/blocking)
-                const { data: apiData, error: apiError } = await supabaseAuth
+                let apiData: any, apiError: any;
+                const res = await supabaseAuth
                     .from('api_keys')
                     .select('gemini_key, providers_keys')
                     .eq('user_id', user.id)
                     .single();
+
+                apiData = res.data;
+                apiError = res.error;
+
+                if (apiError && apiError.code === 'PGRST204') {
+                    // Fallback to old schema
+                    const fallbackRes = await supabaseAuth
+                        .from('api_keys')
+                        .select('gemini_key')
+                        .eq('user_id', user.id)
+                        .single();
+                    apiData = fallbackRes.data;
+                    apiError = fallbackRes.error;
+                }
 
                 if (apiError && apiError.code !== 'PGRST116') {
                     // console.error("Error buscando API keys:", apiError);

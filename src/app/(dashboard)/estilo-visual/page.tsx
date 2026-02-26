@@ -9,39 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Image as ImageIcon, PenTool, Box, PlaySquare, Layout, Sparkles, ImagePlus, UploadCloud, User, Target, Save, Eye } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
-
-const STYLE_OPTIONS = [
-    {
-        id: "ultrarrealista",
-        title: "Ultrarrealista",
-        desc: "Fotografía de alta definición, texturas reales, iluminación de estudio.",
-        icon: ImageIcon
-    },
-    {
-        id: "ilustrado",
-        title: "Ilustrado",
-        desc: "Arte digital vectorial, vibrante y estilizado.",
-        icon: PenTool
-    },
-    {
-        id: "3d-render",
-        title: "3D Render",
-        desc: "Modelo 3D moderno, materiales brillantes, estilo Pixar/Blender.",
-        icon: Box
-    },
-    {
-        id: "animado",
-        title: "Animado",
-        desc: "Estilo cartoon moderno o anime de alta calidad.",
-        icon: PlaySquare
-    },
-    {
-        id: "minimalista",
-        title: "Minimalista",
-        desc: "Diseño limpio, mucho espacio negativo, elegante.",
-        icon: Layout
-    }
-];
+import { useTranslation } from "@/lib/i18n";
 
 export default function EstiloVisualPage() {
     const router = useRouter();
@@ -51,6 +19,40 @@ export default function EstiloVisualPage() {
     const [mounted, setMounted] = useState(false);
     const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const { t } = useTranslation();
+
+    const STYLE_OPTIONS = [
+        {
+            id: "ultrarrealista",
+            title: t.estiloVisual.optUltraTitle,
+            desc: t.estiloVisual.optUltraDesc,
+            icon: ImageIcon
+        },
+        {
+            id: "ilustrado",
+            title: t.estiloVisual.optIlustradoTitle,
+            desc: t.estiloVisual.optIlustradoDesc,
+            icon: PenTool
+        },
+        {
+            id: "3d-render",
+            title: t.estiloVisual.opt3dTitle,
+            desc: t.estiloVisual.opt3dDesc,
+            icon: Box
+        },
+        {
+            id: "animado",
+            title: t.estiloVisual.optAnimadoTitle,
+            desc: t.estiloVisual.optAnimadoDesc,
+            icon: PlaySquare
+        },
+        {
+            id: "minimalista",
+            title: t.estiloVisual.optMinimalistaTitle,
+            desc: t.estiloVisual.optMinimalistaDesc,
+            icon: Layout
+        }
+    ];
 
     useEffect(() => {
         setMounted(true);
@@ -70,18 +72,18 @@ export default function EstiloVisualPage() {
     const handleSave = async () => {
         if (!activeProjectId || !selectedStyle) return;
         setIsSaving(true);
-        const toastId = toast.loading("Guardando estilo visual...");
+        const toastId = toast.loading(t.estiloVisual.guardandoEstilo);
 
         try {
             updateProject(activeProjectId, {
                 visualStyle: selectedStyle,
             });
 
-            toast.success("Estilo visual guardado.", { id: toastId });
+            toast.success(t.estiloVisual.estiloGuardado, { id: toastId });
             router.push("/similitud-ia");
         } catch (error: any) {
             console.error(error);
-            toast.error(error.message || "Error al guardar estilo visual", { id: toastId });
+            toast.error(error.message || t.estiloVisual.errorGuardar, { id: toastId });
         } finally {
             setIsSaving(false);
         }
@@ -95,13 +97,13 @@ export default function EstiloVisualPage() {
                 <div className="text-center sm:text-left flex flex-col items-center sm:items-start text-white">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400 font-medium mb-4">
                         <Eye className="w-3.5 h-3.5" />
-                        Fase 4: Estética Central
+                        {t.estiloVisual.fase}
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4 text-white">
-                        Estilo <span className="text-emerald-400">Visual</span>
+                        {t.estiloVisual.title1} <span className="text-emerald-400">{t.estiloVisual.title2}</span>
                     </h1>
                     <p className="text-zinc-400 text-sm sm:text-base max-w-xl leading-relaxed">
-                        Selecciona el estilo base preferido sobre el que se basará la generación final de creativos.
+                        {t.estiloVisual.subtitle}
                     </p>
                 </div>
             </div>
@@ -155,14 +157,14 @@ export default function EstiloVisualPage() {
 
             <div className="sticky bottom-6 mt-4 p-4 rounded-2xl bg-[#111116] border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xl z-10 w-full">
                 <div className="text-sm text-zinc-400 flex items-center gap-2 px-2">
-                    <Sparkles className="w-4 h-4 text-indigo-400" /> Completa tu entrenamiento IA para mejores resultados.
+                    <Sparkles className="w-4 h-4 text-indigo-400" /> {t.estiloVisual.completaEntrenamiento}
                 </div>
                 <Button
                     onClick={handleSave}
                     disabled={!selectedStyle || isSaving}
                     className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all px-8 h-12 rounded-xl w-full sm:w-auto shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
-                    {isSaving ? "Guardando y Subiendo..." : "Guardar Referencias y Continuar"}
+                    {isSaving ? t.estiloVisual.guardando : t.estiloVisual.guardarContinuar}
                 </Button>
             </div>
         </div >

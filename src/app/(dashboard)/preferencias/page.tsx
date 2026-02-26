@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { ApiConfigTab } from "./components/ApiConfigTab";
+import { useTranslation } from "@/lib/i18n";
 
 type Tab = "perfil" | "idioma" | "api";
 
@@ -25,6 +26,7 @@ export default function PreferenciasPage() {
     const [mounted, setMounted] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showKey, setShowKey] = useState(false);
+    const { t } = useTranslation();
 
     useEffect(() => {
         setMounted(true);
@@ -84,7 +86,7 @@ export default function PreferenciasPage() {
     const handleSaveProfile = async () => {
         if (!user) return;
         setIsSaving(true);
-        const toastId = toast.loading("Actualizando perfil...");
+        const toastId = toast.loading(t.preferencias.actualizandoPerfil);
         try {
             let firstName = fullName;
             let lastName = "";
@@ -94,9 +96,9 @@ export default function PreferenciasPage() {
                 lastName = parts.slice(1).join(" ");
             }
             await user.update({ firstName, lastName });
-            toast.success("Perfil actualizado correctamente", { id: toastId });
+            toast.success(t.preferencias.perfilActualizado, { id: toastId });
         } catch (e: any) {
-            toast.error(e.errors?.[0]?.message || "No se pudo actualizar el perfil", { id: toastId });
+            toast.error(e.errors?.[0]?.message || t.preferencias.errPerfil, { id: toastId });
         } finally {
             setIsSaving(false);
         }
@@ -106,7 +108,7 @@ export default function PreferenciasPage() {
         setLanguage(code);
         updateSettings({ language: code });
         localStorage.setItem("global_ui_lang", code);
-        toast.success("Idioma actualizado. Recarga para ver los cambios.");
+        toast.success(t.preferencias.idiomaActualizado);
     };
 
     if (!mounted) return null;
@@ -119,26 +121,26 @@ export default function PreferenciasPage() {
 
                 {/* SIDEBAR */}
                 <div className="w-full md:w-72 bg-[#0B0A0F] border-r border-white/5 p-6 flex flex-col shrink-0">
-                    <h2 className="text-xl font-bold text-white mb-8 mt-2 px-2">Preferencias</h2>
+                    <h2 className="text-xl font-bold text-white mb-8 mt-2 px-2">{t.preferencias.title}</h2>
 
                     <nav className="flex flex-col gap-1">
                         <button
                             onClick={() => setActiveTab("perfil")}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-medium ${activeTab === "perfil" ? "bg-white/5 text-fuchsia-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"}`}
                         >
-                            <User className="w-4 h-4" /> Perfil Personal
+                            <User className="w-4 h-4" /> {t.preferencias.tabPerfil}
                         </button>
                         <button
                             onClick={() => setActiveTab("idioma")}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-medium ${activeTab === "idioma" ? "bg-white/5 text-fuchsia-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"}`}
                         >
-                            <Globe className="w-4 h-4" /> Idioma de la App
+                            <Globe className="w-4 h-4" /> {t.preferencias.tabIdioma}
                         </button>
                         <button
                             onClick={() => setActiveTab("api")}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-medium ${activeTab === "api" ? "bg-white/5 text-fuchsia-400" : "text-zinc-400 hover:text-zinc-200 hover:bg-white/5"}`}
                         >
-                            <Key className="w-4 h-4" /> Configuración API
+                            <Key className="w-4 h-4" /> {t.preferencias.tabApi}
                         </button>
                     </nav>
                 </div>
@@ -149,8 +151,8 @@ export default function PreferenciasPage() {
                     {/* PROFILE TAB */}
                     {activeTab === "perfil" && (
                         <div className="max-w-xl animate-in fade-in duration-300">
-                            <h3 className="text-2xl font-bold text-white mb-2">Perfil Personal</h3>
-                            <p className="text-sm text-zinc-400 mb-8">Actualiza tu foto y nombre para personalizar tu experiencia.</p>
+                            <h3 className="text-2xl font-bold text-white mb-2">{t.preferencias.perfilTitle}</h3>
+                            <p className="text-sm text-zinc-400 mb-8">{t.preferencias.perfilDesc}</p>
 
                             <div className="flex items-center gap-6 mb-8">
                                 <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 shrink-0 bg-zinc-900">
@@ -161,14 +163,14 @@ export default function PreferenciasPage() {
                                     )}
                                 </div>
                                 <div>
-                                    <h4 className="font-semibold text-white">Foto de Perfil</h4>
-                                    <p className="text-xs text-zinc-500 mt-1">Gesti&oacute;nala desde tu cuenta proveedora.</p>
+                                    <h4 className="font-semibold text-white">{t.preferencias.fotoPerfil}</h4>
+                                    <p className="text-xs text-zinc-500 mt-1">{t.preferencias.fotoGestina}</p>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nombre Completo</label>
+                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">{t.preferencias.nombreCompleto}</label>
                                     <Input
                                         value={fullName}
                                         onChange={(e) => setFullName(e.target.value)}
@@ -182,7 +184,7 @@ export default function PreferenciasPage() {
                                     className="mt-6 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white rounded-xl px-6 h-11"
                                 >
                                     {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                                    Guardar Cambios
+                                    {t.preferencias.btnGuardarPerfil}
                                 </Button>
                             </div>
                         </div>
@@ -191,8 +193,8 @@ export default function PreferenciasPage() {
                     {/* LANGUAGE TAB */}
                     {activeTab === "idioma" && (
                         <div className="max-w-xl animate-in fade-in duration-300">
-                            <h3 className="text-2xl font-bold text-white mb-2">Preferencias de Idioma</h3>
-                            <p className="text-sm text-zinc-400 mb-8">Selecciona el idioma principal de la aplicación. Esto afectará la interfaz global.</p>
+                            <h3 className="text-2xl font-bold text-white mb-2">{t.preferencias.idiomaTitle}</h3>
+                            <p className="text-sm text-zinc-400 mb-8">{t.preferencias.idiomaDesc}</p>
 
                             <div className="flex flex-col gap-3">
                                 {[

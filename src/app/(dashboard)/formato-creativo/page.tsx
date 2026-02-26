@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const FORMAT_OPTIONS = [
     {
@@ -48,6 +49,7 @@ export default function FormatoCreativoPage() {
     const { activeProjectId, projects, updateProject } = useProjectStore();
     const [mounted, setMounted] = useState(false);
     const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
+    const { t } = useTranslation();
 
     useEffect(() => {
         setMounted(true);
@@ -66,7 +68,7 @@ export default function FormatoCreativoPage() {
         setSelectedFormats(prev => {
             const isCurrentlySelected = prev.includes(id);
             if (!isCurrentlySelected && prev.length >= 3) {
-                toast.error("Puedes seleccionar un máximo de 3 formatos creativos a la vez.");
+                toast.error(t.formatoCreativo.errMaxFormatos);
                 return prev;
             }
             return isCurrentlySelected ? prev.filter(f => f !== id) : [...prev, id];
@@ -77,7 +79,7 @@ export default function FormatoCreativoPage() {
         if (!activeProjectId) return;
 
         if (selectedFormats.length === 0) {
-            toast.error("Debes seleccionar al menos un formato para continuar.");
+            toast.error(t.formatoCreativo.errMinFormatos);
             return;
         }
 
@@ -85,7 +87,7 @@ export default function FormatoCreativoPage() {
             creativeFormats: selectedFormats
         });
 
-        toast.success("Formatos guardados con éxito.");
+        toast.success(t.formatoCreativo.formatosGuardados);
         router.push("/estilo-visual");
     };
 
@@ -96,14 +98,14 @@ export default function FormatoCreativoPage() {
             <div className="text-center sm:text-left flex flex-col items-center sm:items-start">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 font-medium mb-4">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Configuración de Formato
+                    {t.formatoCreativo.badge}
                 </div>
-                <h1 className="text-4xl font-bold tracking-tight mb-2">Formato Creativo</h1>
+                <h1 className="text-4xl font-bold tracking-tight mb-2">{t.formatoCreativo.title}</h1>
                 <p className="text-zinc-400 text-lg max-w-2xl text-balance">
-                    Selecciona hasta 3 estilos visuales estructurales. La IA modificará la composición de tus imágenes basándose en las instrucciones ocultas de cada formato.
+                    {t.formatoCreativo.desc}
                 </p>
                 <div className="mt-4 px-4 py-2 bg-zinc-900/50 border border-white/5 rounded-lg flex items-center gap-3">
-                    <span className="text-sm text-zinc-400">Formatos seleccionados:</span>
+                    <span className="text-sm text-zinc-400">{t.formatoCreativo.formatosSeleccionados}</span>
                     <span className={`text-lg font-bold ${selectedFormats.length === 3 ? 'text-amber-500' : 'text-emerald-400'}`}>
                         {selectedFormats.length} / 3
                     </span>
@@ -137,7 +139,7 @@ export default function FormatoCreativoPage() {
                                 {/* Active Badge */}
                                 <div className={`absolute top-4 right-4 z-20 transition-all duration-300 ${isSelected ? "opacity-100 scale-100" : "opacity-0 scale-90"}`}>
                                     <div className="px-3 py-1 bg-emerald-500 text-white text-[11px] font-bold rounded-full flex items-center gap-1 shadow-lg">
-                                        <CheckCircle2 className="w-3 h-3" /> Activo
+                                        <CheckCircle2 className="w-3 h-3" /> {t.formatoCreativo.activo}
                                     </div>
                                 </div>
                             </div>
@@ -146,10 +148,16 @@ export default function FormatoCreativoPage() {
                             <CardContent className="relative z-10 p-6 flex flex-col gap-4">
                                 <div className="space-y-1">
                                     <h3 className={`text-xl font-extrabold tracking-tight leading-tight ${isSelected ? "text-emerald-400" : "text-zinc-100"}`}>
-                                        {format.title}
+                                        {format.id === "noticiero" ? t.formatoCreativo.optNoticieroTitle :
+                                            format.id === "infografia-cta" ? t.formatoCreativo.optInfografiaCtaTitle :
+                                                format.id === "infografia-hook" ? t.formatoCreativo.optInfografiaHookTitle :
+                                                    t.formatoCreativo.optAntesDespuesTitle}
                                     </h3>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        {format.desc}
+                                        {format.id === "noticiero" ? t.formatoCreativo.optNoticieroDesc :
+                                            format.id === "infografia-cta" ? t.formatoCreativo.optInfografiaCtaDesc :
+                                                format.id === "infografia-hook" ? t.formatoCreativo.optInfografiaHookDesc :
+                                                    t.formatoCreativo.optAntesDespuesDesc}
                                     </p>
                                 </div>
 
@@ -160,7 +168,7 @@ export default function FormatoCreativoPage() {
                                     <div className="pt-4 border-t border-white/5">
                                         <div className="text-[10px] font-medium text-emerald-500/70 tracking-widest uppercase mb-2 flex items-center gap-1.5">
                                             <div className="w-1 h-3 bg-emerald-500/50 rounded-full" />
-                                            INSTRUCCIÓN PARA IA
+                                            {t.formatoCreativo.instruccionIa}
                                         </div>
                                         <div className="p-3 rounded-lg bg-black/40 border border-emerald-500/10 text-xs text-zinc-400 font-mono leading-relaxed">
                                             {format.instruction}
@@ -175,13 +183,13 @@ export default function FormatoCreativoPage() {
 
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 pt-6 border-t border-white/10">
                 <p className="text-sm text-amber-500/80 flex items-center gap-2">
-                    <span className="text-amber-500">⚠️</span> Solo los estilos marcados como <strong>Activos</strong> serán utilizados.
+                    <span className="text-amber-500">⚠️</span> {t.formatoCreativo.avisoActivos}
                 </p>
                 <Button
                     onClick={handleSave}
                     className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base"
                 >
-                    Siguiente: Estilo Visual <ArrowRight className="w-5 h-5 ml-2" />
+                    {t.formatoCreativo.btnSiguiente} <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
             </div>
         </div>

@@ -3,20 +3,24 @@
 import { usePathname } from "next/navigation";
 import { Check, Dot } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/lib/i18n";
 
-const STEPS = [
-    { id: "/configurar-negocio", label: "Extracción", stepIndex: 1 },
-    { id: "/identidad-visual", label: "Identidad", stepIndex: 2 },
-    { id: "/formato-creativo", label: "Formato", stepIndex: 3 },
-    { id: "/estilo-visual", label: "Estilo Visual", stepIndex: 4 },
-    { id: "/similitud-ia", label: "Similitud IA", stepIndex: 5 },
-    { id: "/analisis-ia", label: "Análisis IA", stepIndex: 6 },
-    { id: "/angulos", label: "Ángulos", stepIndex: 7 },
-    { id: "/fabrica", label: "Fábrica", stepIndex: 8 },
+const STEPS_BASE = [
+    { id: "/configurar-negocio", key: "extraccion", stepIndex: 1 },
+    { id: "/identidad-visual", key: "identidad", stepIndex: 2 },
+    { id: "/formato-creativo", key: "formato", stepIndex: 3 },
+    { id: "/estilo-visual", key: "estiloVisual", stepIndex: 4 },
+    { id: "/similitud-ia", key: "similitudIa", stepIndex: 5 },
+    { id: "/analisis-ia", key: "analisisIa", stepIndex: 6 },
+    { id: "/angulos", key: "angulos", stepIndex: 7 },
+    { id: "/fabrica", key: "fabrica", stepIndex: 8 },
 ];
 
 export function GlobalStepper() {
     const pathname = usePathname();
+    const { t } = useTranslation();
+
+    const STEPS = STEPS_BASE.map(s => ({ ...s, label: t.stepper[s.key as keyof typeof t.stepper] }));
 
     // Encontrar el paso actual basándose en la ruta
     const currentStepIndex = STEPS.findIndex(s => pathname === s.id);

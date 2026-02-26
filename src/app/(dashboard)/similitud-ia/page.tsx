@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, UploadCloud, User, ImagePlus, ArrowRight } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
+import { useTranslation } from "@/lib/i18n";
 
 export default function SimilitudIAPage() {
     const router = useRouter();
     const { getToken } = useAuth();
     const { activeProjectId, projects, updateProject } = useProjectStore();
     const [mounted, setMounted] = useState(false);
+    const { t } = useTranslation();
 
     const [styleReferenceFiles, setStyleReferenceFiles] = useState<File[]>([]);
     const [faceImageFiles, setFaceImageFiles] = useState<File[]>([]);
@@ -58,7 +60,7 @@ export default function SimilitudIAPage() {
     const handleSave = async () => {
         if (!activeProjectId) return;
         setIsSaving(true);
-        const toastId = toast.loading("Guardando referencias para Similitud IA...");
+        const toastId = toast.loading(t.similitud.guardando);
 
         try {
             const token = await getToken({ template: 'supabase' });
@@ -127,13 +129,13 @@ export default function SimilitudIAPage() {
                 <div className="text-center sm:text-left flex flex-col items-center sm:items-start text-white">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-sky-400 font-medium mb-4">
                         <Sparkles className="w-3.5 h-3.5" />
-                        Fase 5: Decodifica el Éxito
+                        {t.similitud.fase}
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4 text-white">
-                        Similitud <span className="text-sky-400">IA</span>
+                        {t.similitud.title} <span className="text-sky-400">IA</span>
                     </h1>
                     <p className="text-zinc-400 text-sm sm:text-base max-w-xl leading-relaxed">
-                        Sube anuncios ganadores. La IA extraerá sus patrones ocultos (ángulos, colores, emociones) para replicar su éxito con tu propio producto.
+                        {t.similitud.subtitle}
                     </p>
                 </div>
             </div>
@@ -145,10 +147,10 @@ export default function SimilitudIAPage() {
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <ImagePlus className="w-5 h-5 text-pink-400" />
-                            <h3 className="font-bold text-white text-lg">Sube Referencias</h3>
+                            <h3 className="font-bold text-white text-lg">{t.similitud.subirRef}</h3>
                         </div>
                         <p className="text-xs text-zinc-500">
-                            Arrastra imágenes de tu competencia o productos virales de los cuales quieras copiar composición y estilo.
+                            {t.similitud.arrastraRef}
                         </p>
                     </div>
 
@@ -157,7 +159,7 @@ export default function SimilitudIAPage() {
                         className="mt-2 border-2 border-dashed border-white/10 p-8 rounded-xl bg-black/20 hover:bg-white/5 cursor-pointer transition-colors text-center flex flex-col items-center justify-center"
                     >
                         <UploadCloud className="w-8 h-8 text-zinc-600 mb-3" />
-                        <span className="text-sm font-medium text-zinc-400">Click para subir (Máx 2)</span>
+                        <span className="text-sm font-medium text-zinc-400">{t.similitud.clickSubir}</span>
                         <input
                             id="style-upload"
                             type="file"
@@ -177,7 +179,7 @@ export default function SimilitudIAPage() {
                                         e.stopPropagation();
                                         setStyleReferenceFiles(prev => prev.filter((_, i) => i !== idx));
                                     }} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
-                                        Quitar
+                                        {t.similitud.quitar}
                                     </button>
                                 </div>
                             ))}
@@ -191,10 +193,10 @@ export default function SimilitudIAPage() {
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <User className="w-5 h-5 text-sky-400" />
-                            <h3 className="font-bold text-white text-lg">Fotos de Rostro <span className="text-zinc-500 font-normal text-sm">(Opcional)</span></h3>
+                            <h3 className="font-bold text-white text-lg">{t.similitud.fotosRostro} <span className="text-zinc-500 font-normal text-sm">{t.similitud.opcional}</span></h3>
                         </div>
                         <p className="text-xs text-zinc-500">
-                            ¿Quieres que la IA genere el creativo usando tu cara o la de tu cliente? Sube hasta 4 fotos claras mirando al frente.
+                            {t.similitud.quieresGenerar}
                         </p>
                     </div>
 
@@ -203,7 +205,7 @@ export default function SimilitudIAPage() {
                         className="mt-2 border-2 border-dashed border-white/10 p-8 rounded-xl bg-black/20 hover:bg-white/5 cursor-pointer transition-colors text-center flex flex-col items-center justify-center"
                     >
                         <UploadCloud className="w-8 h-8 text-zinc-600 mb-3" />
-                        <span className="text-sm font-medium text-zinc-400">Click para subir (Máx 4)</span>
+                        <span className="text-sm font-medium text-zinc-400">{t.similitud.clickSubirRostro}</span>
                         <input
                             id="face-upload"
                             type="file"
@@ -223,7 +225,7 @@ export default function SimilitudIAPage() {
                                         e.stopPropagation();
                                         setFaceImageFiles(prev => prev.filter((_, i) => i !== idx));
                                     }} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
-                                        Quitar
+                                        {t.similitud.quitar}
                                     </button>
                                 </div>
                             ))}
@@ -234,14 +236,14 @@ export default function SimilitudIAPage() {
 
             <div className="sticky bottom-6 mt-4 p-4 rounded-2xl bg-[#111116] border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xl z-10 w-full">
                 <div className="text-sm text-zinc-400 flex items-center gap-2 px-2">
-                    <Sparkles className="w-4 h-4 text-sky-400" /> ¡Estás un paso más cerca de tu arte ganador!
+                    <Sparkles className="w-4 h-4 text-sky-400" /> {t.similitud.pasoCerca}
                 </div>
                 <Button
                     onClick={handleSave}
                     disabled={isSaving}
                     className="bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold transition-all px-8 h-12 rounded-xl w-full sm:w-auto shadow-lg shadow-sky-500/20 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
-                    {isSaving ? "Guardando y Subiendo..." : "Guardar Referencias"}
+                    {isSaving ? t.similitud.guardando : t.similitud.guardarRef}
                     {!isSaving && <ArrowRight className="w-4 h-4 ml-2" />}
                 </Button>
             </div>

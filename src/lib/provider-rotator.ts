@@ -15,6 +15,7 @@ interface ProviderRotatorOptions {
 interface ProviderResponse {
     provider: string;
     url?: string;
+    urls?: string[];
     text?: string;
     success: boolean;
     error?: string;
@@ -36,11 +37,27 @@ export async function executeWithRotation(options: ProviderRotatorOptions): Prom
     }
 
     // 1. Fetch User Keys & Limits from DB
-    const { data: apiKeyData, error: apiKeyError } = await supabase
+    let apiKeyData: any, apiKeyError: any;
+
+    const res = await supabase
         .from('api_keys')
         .select('daily_generations, last_generation_date, providers_keys')
         .eq('user_id', options.userId)
         .single();
+
+    apiKeyData = res.data;
+    apiKeyError = res.error;
+
+    if (apiKeyError && apiKeyError.code === 'PGRST204') {
+        // Fallback if providers_keys column does not exist
+        const fallbackRes = await supabase
+            .from('api_keys')
+            .select('daily_generations, last_generation_date')
+            .eq('user_id', options.userId)
+            .single();
+        apiKeyData = fallbackRes.data;
+        apiKeyError = fallbackRes.error;
+    }
 
     if (apiKeyError && apiKeyError.code !== 'PGRST116') {
         throw new Error("Error fetching API keys for rotation: " + apiKeyError.message);
@@ -70,16 +87,17 @@ export async function executeWithRotation(options: ProviderRotatorOptions): Prom
     let providerPriorityOrder: { id: string; keys: string[] }[] = [];
 
     if (options.taskType === "image") {
-        // Image generation Priority: 1. Replicate (Stable Diffusion), 2. HuggingFace (if implemented later)
+        // Image generation Priority: 1. Replicate (Stable Diffusion), 2. Pollinations (Free fallback)
         providerPriorityOrder = [
             { id: "replicate", keys: activeReplicateKeys },
-            // Add fallback to others if image gen is supported
+            { id: "pollinations", keys: ["free-tier"] } // No key needed, but we pass a dummy string to bypass the length check
         ];
     } else if (options.taskType === "text") {
-        // Text generation Priority: 1. Groq (Fastest), 2. Gemini
+        // Text generation Priority: 1. Groq (Fastest), 2. Gemini, 3. Pollinations (Free Fallback)
         providerPriorityOrder = [
             { id: "groq", keys: activeGroqKeys },
             { id: "gemini", keys: activeGeminiKeys },
+            { id: "pollinations-text", keys: ["free-tier"] }
         ];
     }
 
@@ -153,7 +171,38 @@ async function executeSpecificProvider(providerId: string, apiKey: string, optio
 
         // Assume output is an array of URLs
         const urls = Array.isArray(output) ? output : [output];
-        return { provider: "replicate", success: true, url: urls[0] }; // Modificado posteriormente en el endpoint principal si requiere arrays completos.
+        return { provider: "replicate", success: true, url: urls[0], urls };
+    } else if (providerId === "pollinations") {
+        const prompt = options.imagePrompt || "beautiful scenery";
+        const numVariants = options.numVariants || 1;
+        const urls: string[] = [];
+
+        // Pollinations requires query params for customization, especially seed for variants
+        for (let i = 0; i < numVariants; i++) {
+            const seed = Math.floor(Math.random() * 1000000000);
+            const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=1080&height=1350&nologo=true`;
+            urls.push(url);
+        }
+
+        // We don't need to await anything as pollinations URLs generate on the fly when rendered
+        return { provider: "pollinations", success: true, url: urls[0], urls };
+    } else if (providerId === "pollinations-text") {
+        const fullPrompt = `${options.systemPrompt || ""}\n\n${options.userPrompt || ""}`;
+        const fetchRes = await fetch("https://text.pollinations.ai/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                messages: [
+                    { role: "system", content: options.systemPrompt || "Eres un experto." },
+                    { role: "user", content: options.userPrompt || "Responde cortamente." }
+                ],
+                model: "openai"
+            })
+        });
+
+        if (!fetchRes.ok) throw new Error("Pollinations Text Error: " + fetchRes.statusText);
+        const text = await fetchRes.text();
+        return { provider: "pollinations-text", success: true, text: text };
     }
 
     throw new Error(`Provider ${providerId} not supported for direct internal rotary call yet`);

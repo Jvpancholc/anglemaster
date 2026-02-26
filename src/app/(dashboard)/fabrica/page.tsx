@@ -14,6 +14,7 @@ import Link from "next/link";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { ApiKeyModal } from "@/components/ui/ApiKeyModal";
+import { useTranslation } from "@/lib/i18n";
 
 const FALLBACK_CONTEXT = {
     visualStyle: "3D Render",
@@ -37,6 +38,7 @@ export default function FabricaCreativaPage() {
     const { user } = useUser();
     const { activeProjectId, projects, settings } = useProjectStore();
     const [mounted, setMounted] = useState(false);
+    const { t } = useTranslation(); // Added useTranslation hook
 
     const [angles, setAngles] = useState<{ id: string; text: string }[]>([]);
     const [selectedAngleId, setSelectedAngleId] = useState<string>("");
@@ -143,10 +145,10 @@ export default function FabricaCreativaPage() {
     };
 
     const handleDeleteCreative = async (creativeId: string) => {
-        const confirmDelete = window.confirm("¿Estás seguro de que deseas eliminar este creativo de tu proyecto?");
+        const confirmDelete = window.confirm(t.fabrica.confirmDelete); // Replaced string
         if (!confirmDelete) return;
 
-        const loadingToast = toast.loading("Eliminando creativo...", { icon: '🗑️' });
+        const loadingToast = toast.loading(t.fabrica.deletingCreative, { icon: '🗑️' }); // Replaced string
 
         try {
             const res = await fetch("/api/delete-creative", {
@@ -156,14 +158,14 @@ export default function FabricaCreativaPage() {
             });
 
             const data = await res.json();
-            if (!res.ok || data.error) throw new Error(data.error || "Falló la eliminación");
+            if (!res.ok || data.error) throw new Error(data.error || t.fabrica.deleteFailed); // Replaced string
 
             setSavedCreatives(prev => prev.filter(c => c.id !== creativeId));
-            toast.success("Creativo eliminado correctamente.", { id: loadingToast, icon: '✅' });
+            toast.success(t.fabrica.creativeDeleted, { id: loadingToast, icon: '✅' }); // Replaced string
 
         } catch (error: any) {
             console.error("Delete creative error", error);
-            toast.error(error.message || "No se pudo eliminar el creativo.", { id: loadingToast });
+            toast.error(error.message || t.fabrica.deleteError, { id: loadingToast }); // Replaced string
         }
     };
 
@@ -187,7 +189,7 @@ export default function FabricaCreativaPage() {
             setProjectContext(FALLBACK_CONTEXT);
             setIsFetching(false);
             if (!activeProjectId) {
-                toast.info("Modo demostración: utilizando datos de ejemplo porque no hay proyecto activo.");
+                toast.info(t.fabrica.demoMode); // Replaced string
             }
         }
     }, [activeProjectId, projects, userId]);
@@ -196,7 +198,7 @@ export default function FabricaCreativaPage() {
         setIsApiKeyModalOpen(false); // Make sure model doesn't block
 
         if (angles.length === 0) {
-            toast.error("No hay ángulos disponibles.");
+            toast.error(t.fabrica.noAnglesAvailable); // Replaced string
             return;
         }
 
@@ -204,7 +206,7 @@ export default function FabricaCreativaPage() {
         const totalImagesToGenerate = countPerAngle * angles.length;
 
         if (generationsLeft !== 'Ilimitado' && typeof generationsLeft === 'number' && generationsLeft < totalImagesToGenerate) {
-            toast.error(`Límite diario insuficiente para generar ${totalImagesToGenerate} imágenes. Actualiza tu plan o añade API keys en Preferencias.`);
+            toast.error(t.fabrica.limitExceeded(totalImagesToGenerate)); // Replaced string
             return;
         }
 
@@ -213,9 +215,9 @@ export default function FabricaCreativaPage() {
 
         try {
             const token = await getToken({ template: 'supabase' });
-            if (!token) throw new Error("No autenticado en Supabase");
+            if (!token) throw new Error(t.fabrica.notAuthenticated); // Replaced string
 
-            toast.loading(`Generando para ${angles.length} ángulo(s)...`, { id: 'genToast' });
+            toast.loading(t.fabrica.generatingForAngles(angles.length), { id: 'genToast' }); // Replaced string
 
             const generationPromises = angles.map(async (angleObj) => {
                 const payload = {
@@ -245,11 +247,11 @@ export default function FabricaCreativaPage() {
                     data = JSON.parse(responseText);
                 } catch (e) {
                     console.error("Non-JSON:", responseText);
-                    throw new Error("El servidor devolvió un error inesperado.");
+                    throw new Error(t.fabrica.unexpectedServerError); // Replaced string
                 }
 
                 if (!res.ok || data.error) {
-                    throw new Error(data.error || "Error en la respuesta del servidor");
+                    throw new Error(data.error || t.fabrica.serverError); // Replaced string
                 }
                 return data;
             });
@@ -268,7 +270,7 @@ export default function FabricaCreativaPage() {
             });
 
             if (allCreativeIds.length > 0) {
-                toast.loading(`Trabajos encolados. Generando las ${totalImagesToGenerate} imágenes finales...`, { id: 'genToast' });
+                toast.loading(t.fabrica.jobsQueued(totalImagesToGenerate), { id: 'genToast' }); // Replaced string
 
                 let attempts = 0;
                 const maxAttempts = 60;
@@ -297,7 +299,7 @@ export default function FabricaCreativaPage() {
                                 }
 
                                 setIsGenerating(false);
-                                toast.success("¡Creativos generados existosamente!", { id: 'genToast' });
+                                toast.success(t.fabrica.creativesGenerated, { id: 'genToast' }); // Replaced string
                                 fetchSavedCreatives();
                             }
                         }
@@ -311,7 +313,7 @@ export default function FabricaCreativaPage() {
                     setGenerationsLeft(prev => typeof prev === 'number' ? prev - totalImagesToGenerate : prev);
                 }
                 setIsGenerating(false);
-                toast.success("Creativos generados existosamente.", { id: 'genToast' });
+                toast.success(t.fabrica.creativesGenerated, { id: 'genToast' }); // Replaced string
                 fetchSavedCreatives();
             } else {
                 toast.dismiss('genToast');
@@ -321,14 +323,14 @@ export default function FabricaCreativaPage() {
         } catch (error: any) {
             console.error("Generación fallida:", error);
             setIsGenerating(false);
-            toast.error(error.message || "Error al conectar con la API de generación.", { id: 'genToast' });
+            toast.error(error.message || t.fabrica.generationApiError, { id: 'genToast' }); // Replaced string
         }
     };
 
     const handleDownloadAll = async () => {
         if (generatedImages.length === 0) return;
 
-        toast.info("Preparando archivo ZIP para descargar...");
+        toast.info(t.fabrica.preparingZip); // Replaced string
         try {
             const zip = new JSZip();
 
@@ -343,10 +345,10 @@ export default function FabricaCreativaPage() {
 
             const content = await zip.generateAsync({ type: "blob" });
             saveAs(content, "creativos_anglemaster.zip");
-            toast.success("¡Descarga completada!");
+            toast.success(t.fabrica.downloadComplete); // Replaced string
         } catch (error) {
             console.error("Error al descargar ZIP:", error);
-            toast.error("Hubo un problema al crear el archivo ZIP. Abre la consola para más detalles.");
+            toast.error(t.fabrica.zipError); // Replaced string
         }
     };
 
@@ -357,7 +359,7 @@ export default function FabricaCreativaPage() {
             saveAs(blob, `creativo_${index + 1}.png`);
         } catch (error) {
             console.error("Error al descargar imagen:", error);
-            toast.error("No se pudo descargar la imagen individual.");
+            toast.error(t.fabrica.singleDownloadError); // Replaced string
         }
     };
 
@@ -367,7 +369,7 @@ export default function FabricaCreativaPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-4" />
-                <p className="text-zinc-500">Cargando ángulos y contexto...</p>
+                <p className="text-zinc-500">{t.fabrica.loadingAngles}</p> {/* Replaced string */}
             </div>
         );
     }
@@ -378,13 +380,13 @@ export default function FabricaCreativaPage() {
                 <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mb-6 border border-rose-500/20">
                     <AlertTriangle className="w-10 h-10 text-rose-500" />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight mb-4">No hay ángulos generados</h1>
+                <h1 className="text-3xl font-bold tracking-tight mb-4">{t.fabrica.noAnglesGenerated}</h1> {/* Replaced string */}
                 <p className="text-zinc-400 text-lg max-w-md mx-auto mb-8">
-                    Para generar creativos necesitas la materia prima. Vuelve a la sección de Ángulos y guarda al menos uno.
+                    {t.fabrica.noAnglesDescription} {/* Replaced string */}
                 </p>
                 <Link href="/angulos">
                     <Button className="bg-white hover:bg-zinc-200 text-black px-8 py-6 rounded-full font-bold">
-                        <ArrowLeft className="w-5 h-5 mr-2" /> Volver a Ángulos
+                        <ArrowLeft className="w-5 h-5 mr-2" /> {t.fabrica.backToAngles} {/* Replaced string */}
                     </Button>
                 </Link>
             </div>
@@ -397,19 +399,19 @@ export default function FabricaCreativaPage() {
                 <div>
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400 font-medium mb-4">
                         <Wand2 className="w-3.5 h-3.5" />
-                        Fábrica Creativa
+                        {t.fabrica.fase} {/* Replaced string */}
                     </div>
                     <h1 className="text-4xl font-black tracking-tight mb-2 text-white">
-                        Generador de <span className="text-cyan-400">Contenido</span>
+                        {t.fabrica.title} <span className="text-cyan-400">{t.fabrica.titleColor}</span> {/* Replaced string */}
                     </h1>
                     <p className="text-zinc-500 text-sm max-w-2xl">
-                        Visualiza, genera y escala tus creativos ganadores.
+                        {t.fabrica.subtitle} {/* Replaced string */}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
                     <div className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-xs font-semibold text-violet-300 whitespace-nowrap">
-                        Límite Diario: {generationsLeft} restantes
+                        {t.fabrica.limiteDiario}: {generationsLeft} {t.fabrica.restantes} {/* Replaced string */}
                     </div>
                     <div className="flex gap-1 bg-white/5 rounded-full p-1 border border-white/10 text-xs text-zinc-400 font-medium shrink-0">
                         {["1:1", "4:5", "9:16", "16:9", "4:3"].map((fmt) => (
@@ -430,7 +432,7 @@ export default function FabricaCreativaPage() {
                         {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : (
                             <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                         )}
-                        Generar Todo (Masters)
+                        {t.fabrica.generarTodo} {/* Replaced string */}
                     </Button>
                 </div>
             </div>
@@ -445,7 +447,7 @@ export default function FabricaCreativaPage() {
                         <div>
                             <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 relative">
                                 <span className="absolute -top-3 left-6 inline-block px-3 py-1 bg-violet-600 border border-violet-500 rounded-full text-[10px] text-white font-bold tracking-wider">
-                                    {angles.length} ÁNGULO{angles.length > 1 ? 'S' : ''} SELECCIONADO{angles.length > 1 ? 'S' : ''}
+                                    {angles.length === 1 ? t.fabrica.anguloSelec : `${angles.length} ${t.fabrica.angulosSelec}`} {/* Replaced string */}
                                 </span>
 
                                 <div className="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
@@ -460,62 +462,62 @@ export default function FabricaCreativaPage() {
 
                             <div className="bg-[#050505] border border-white/5 rounded-2xl p-6 space-y-6">
                                 <div>
-                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider mb-2 block">VISUAL</label>
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider mb-2 block">{t.fabrica.visual}</label> {/* Replaced string */}
                                     <Select value={generationStyle} onValueChange={setGenerationStyle}>
                                         <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="bg-zinc-900 border-white/10">
-                                            <SelectItem value="brand">Identidad de Marca</SelectItem>
-                                            <SelectItem value="free">Estilo Libre</SelectItem>
+                                            <SelectItem value="brand">{t.fabrica.brandIdentity}</SelectItem> {/* Replaced string */}
+                                            <SelectItem value="free">{t.fabrica.freeStyle}</SelectItem> {/* Replaced string */}
                                         </SelectContent>
                                     </Select>
 
                                     {generationStyle === 'brand' && (
                                         <div className="mt-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
                                             <p className="text-zinc-300 text-xs italic line-clamp-2">
-                                                ★ {projectContext?.visualStyle || "Estilo visual no definido"}
+                                                ★ {projectContext?.visualStyle || t.fabrica.visualStyleNotDefined} {/* Replaced string */}
                                             </p>
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="border-t border-white/5 pt-6">
-                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">FORMATO</label>
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">{t.fabrica.formato}</label> {/* Replaced string */}
                                     <Select value={generationFormat} onValueChange={setGenerationFormat}>
                                         <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="bg-zinc-900 border-white/10">
-                                            <SelectItem value="1:1">Cuadrado (1:1)</SelectItem>
-                                            <SelectItem value="4:5">Feed (4:5)</SelectItem>
-                                            <SelectItem value="9:16">Stories/Reels (9:16)</SelectItem>
-                                            <SelectItem value="16:9">Wide (16:9)</SelectItem>
+                                            <SelectItem value="1:1">{t.fabrica.square}</SelectItem> {/* Replaced string */}
+                                            <SelectItem value="4:5">{t.fabrica.feed}</SelectItem> {/* Replaced string */}
+                                            <SelectItem value="9:16">{t.fabrica.storiesReels}</SelectItem> {/* Replaced string */}
+                                            <SelectItem value="16:9">{t.fabrica.wide}</SelectItem> {/* Replaced string */}
                                         </SelectContent>
                                     </Select>
                                 </div>
 
                                 <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-4">
                                     <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">MODELO DE IA</label>
+                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">{t.fabrica.modelo}</label> {/* Replaced string */}
                                         <Select value={generationModel} onValueChange={setGenerationModel}>
                                             <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-zinc-900 border-white/10">
-                                                <SelectItem value="flux-pro">Flux 1.1 Pro</SelectItem>
-                                                <SelectItem value="sdxl">SD XL</SelectItem>
+                                                <SelectItem value="flux-pro">{t.fabrica.fluxPro}</SelectItem> {/* Replaced string */}
+                                                <SelectItem value="sdxl">{t.fabrica.sdxl}</SelectItem> {/* Replaced string */}
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">VARIANTES</label>
+                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">{t.fabrica.variantes}</label> {/* Replaced string */}
                                         <Select value={variantCount} onValueChange={setVariantCount}>
                                             <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-zinc-900 border-white/10">
-                                                {[1, 2, 4].map(n => <SelectItem key={n} value={n.toString()}>{n} Imágenes</SelectItem>)}
+                                                {[1, 2, 4].map(n => <SelectItem key={n} value={n.toString()}>{n} {t.fabrica.images}</SelectItem>)} {/* Replaced string */}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -530,7 +532,7 @@ export default function FabricaCreativaPage() {
                                 className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-8 py-6 font-semibold shadow-[0_4px_20px_rgba(124,58,237,0.3)] w-full sm:w-auto"
                             >
                                 {isGenerating ? <Loader2 className="w-5 h-5 mr-3 animate-spin" /> : <Wand2 className="w-5 h-5 mr-3 text-cyan-300" />}
-                                {isGenerating ? 'Generando...' : 'Generar Imagen Principal'}
+                                {isGenerating ? t.fabrica.generando : t.fabrica.generarImagen} {/* Replaced string */}
                             </Button>
                         </div>
                     </div>

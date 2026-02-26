@@ -26,11 +26,26 @@ export async function POST(req: Request) {
         const today = new Date().toISOString().split('T')[0];
 
         if (userId) {
-            const { data: apiKeyData, error: apiKeyError } = await supabase
+            let apiKeyData: any, apiKeyError: any;
+
+            const res = await supabase
                 .from('api_keys')
                 .select('daily_generations, last_generation_date, providers_keys')
                 .eq('user_id', userId)
                 .single();
+
+            apiKeyData = res.data;
+            apiKeyError = res.error;
+
+            if (apiKeyError && apiKeyError.code === 'PGRST204') {
+                const fallbackRes = await supabase
+                    .from('api_keys')
+                    .select('daily_generations, last_generation_date')
+                    .eq('user_id', userId)
+                    .single();
+                apiKeyData = fallbackRes.data;
+                apiKeyError = fallbackRes.error;
+            }
 
             // Determine if the user has their own custom keys configured
             const hasOwnKey =
@@ -126,8 +141,8 @@ export async function POST(req: Request) {
             numVariants: variantsInt
         });
 
-        // The rotator returns urls (or texts). Extract the generated URLs
-        const generatedUrls = rotatedResults.map(r => r.url).filter(Boolean) as string[];
+        // PENDING RECORDS IN DATABASE
+        const generatedUrls = rotatedResults.flatMap(r => r.urls || (r.url ? [r.url] : []));
 
         // PENDING RECORDS IN DATABASE
         const newCreatives = generatedUrls.map((url) => ({

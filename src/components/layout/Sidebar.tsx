@@ -78,8 +78,24 @@ const routes = [
   },
 ];
 
+import { useTranslation } from "@/lib/i18n";
+
 export const Sidebar = () => {
   const pathname = usePathname();
+  const { t } = useTranslation();
+
+  const routesWithT = [
+    { ...routes[0], label: t.sidebar.inicio },
+    { ...routes[1], label: t.sidebar.configurarNegocio },
+    { ...routes[2], label: t.sidebar.identidadVisual },
+    { ...routes[3], label: t.sidebar.formatoCreativo },
+    { ...routes[4], label: t.sidebar.estiloVisual },
+    { ...routes[5], label: t.sidebar.similitudIa },
+    { ...routes[6], label: t.sidebar.analisisIa },
+    { ...routes[7], label: t.sidebar.angulos },
+    { ...routes[8], label: t.sidebar.fabrica },
+    { ...routes[9], label: t.sidebar.preferencias },
+  ];
 
   return (
     <div className="space-y-4 py-4 flex flex-col h-full bg-transparent text-foreground">
@@ -96,7 +112,7 @@ export const Sidebar = () => {
           </h1>
         </Link>
         <div className="space-y-1">
-          {routes.map((route) => (
+          {routesWithT.map((route) => (
             <Link
               href={route.href}
               key={route.href}

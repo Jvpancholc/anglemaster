@@ -23,18 +23,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@supabase/supabase-js";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { useTranslation } from "@/lib/i18n";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl || "https://mock.supabase.co", supabaseAnonKey || "mock-key");
-
-const formSchema = z.object({
-    businessName: z.string().min(2, { message: "Mínimo 2 caracteres." }),
-    shopifyUrl: z.string().url({ message: "URL válida requerida." }).or(z.literal("")),
-    niche: z.string().min(2, { message: "Requerido." }),
-    productDescription: z.string().min(10, { message: "Mínimo 10 caracteres." }),
-    mainCta: z.string().optional(),
-});
 
 export default function ConfigurarNegocioPage() {
     const router = useRouter();
@@ -46,6 +39,15 @@ export default function ConfigurarNegocioPage() {
     const [productPhotos, setProductPhotos] = useState<string[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const { t } = useTranslation();
+
+    const formSchema = z.object({
+        businessName: z.string().min(2, { message: t.configurarNegocio.min2 }),
+        shopifyUrl: z.string().url({ message: t.configurarNegocio.urlValida }).or(z.literal("")),
+        niche: z.string().min(2, { message: t.configurarNegocio.requerido }),
+        productDescription: z.string().min(10, { message: t.configurarNegocio.min10 }),
+        mainCta: z.string().optional(),
+    });
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -83,19 +85,19 @@ export default function ConfigurarNegocioPage() {
         if (!file || !activeProjectId) return;
 
         if (file.size > 5 * 1024 * 1024) {
-            toast.error("El archivo excede el tamaño máximo permitido (5MB).");
+            toast.error(t.configurarNegocio.tamanoExc);
             return;
         }
 
         setIsUploading(true);
-        const toastId = toast.loading("Subiendo foto...");
+        const toastId = toast.loading(t.configurarNegocio.subiendoFoto);
 
         try {
             if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
                 const token = await getToken({ template: 'supabase' });
 
                 if (!token) {
-                    toast.error("Error de autenticación: No se ha podido validar tu sesión con Clerk.", { id: toastId });
+                    toast.error(t.configurarNegocio.errAuthClerk, { id: toastId });
                     setIsUploading(false);
                     return;
                 }
@@ -135,7 +137,7 @@ export default function ConfigurarNegocioPage() {
                     newPhotos[index] = newUrl;
                     return newPhotos;
                 });
-                toast.success("Foto subida correctamente", { id: toastId });
+                toast.success(t.configurarNegocio.fotoSubida, { id: toastId });
             } else {
                 // Mock local URL for demo
                 const newUrl = URL.createObjectURL(file);
@@ -144,11 +146,11 @@ export default function ConfigurarNegocioPage() {
                     newPhotos[index] = newUrl;
                     return newPhotos;
                 });
-                toast.success("Foto mockeada localmente", { id: toastId });
+                toast.success(t.configurarNegocio.fotoMock, { id: toastId });
             }
         } catch (error: any) {
             console.error(error);
-            toast.error(`Error al subir imagen: ${error.message}`, { id: toastId });
+            toast.error(`${t.configurarNegocio.errSubir}: ${error.message}`, { id: toastId });
         } finally {
             setIsUploading(false);
             e.target.value = ""; // reset input
@@ -177,7 +179,7 @@ export default function ConfigurarNegocioPage() {
                                 onClick={(e) => { e.preventDefault(); handleRemovePhoto(index); }}
                                 className="h-8 rounded-full px-3"
                             >
-                                <X className="w-4 h-4 mr-1" /> Quitar
+                                <X className="w-4 h-4 mr-1" /> {t.configurarNegocio.quitar}
                             </Button>
                         </div>
                     </>
@@ -192,7 +194,7 @@ export default function ConfigurarNegocioPage() {
                         />
                         {index === 0 ? <Upload className="w-6 h-6 text-zinc-400 mb-2 group-hover:scale-110 transition-transform" /> : <Plus className="w-6 h-6 text-zinc-400 mb-2 group-hover:scale-110 transition-transform" />}
                         <span className="text-sm font-medium text-zinc-300">{label}</span>
-                        <span className="text-xs text-zinc-500">{index === 0 ? "Subir" : "Añadir"}</span>
+                        <span className="text-xs text-zinc-500">{index === 0 ? t.configurarNegocio.subir : t.configurarNegocio.anadir}</span>
                     </>
                 )}
             </div>
@@ -227,7 +229,7 @@ export default function ConfigurarNegocioPage() {
                 const token = await getToken({ template: 'supabase' });
 
                 if (!token) {
-                    toast.error("Error de autenticación: No se ha podido validar tu sesión.");
+                    toast.error(t.configurarNegocio.errAuth);
                     setIsSaving(false);
                     return;
                 }
@@ -258,17 +260,17 @@ export default function ConfigurarNegocioPage() {
 
                 if (dbError) {
                     console.error("No se pudo insertar en la tabla business_config:", dbError);
-                    toast.error(`Error guardando en base de datos: ${dbError.message}`);
+                    toast.error(`${t.configurarNegocio.errGuardarBD}: ${dbError.message}`);
                     setIsSaving(false);
                     return; // Stop execution to prevent success message
                 }
             }
 
-            toast.success("Información guardada exitosamente");
+            toast.success(t.configurarNegocio.infoGuardada);
             router.push("/identidad-visual");
         } catch (error) {
             console.error("Error saving config:", error);
-            toast.error("Hubo un error al guardar la configuración.");
+            toast.error(t.configurarNegocio.errGuardarConf);
         } finally {
             setIsSaving(false);
         }
@@ -279,16 +281,16 @@ export default function ConfigurarNegocioPage() {
     return (
         <div className="flex flex-col gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Configurar Negocio</h1>
+                <h1 className="text-3xl font-bold tracking-tight">{t.configurarNegocio.title}</h1>
                 <p className="text-muted-foreground mt-2">
-                    Define la información principal de tu tienda y el producto que vas a vender.
+                    {t.configurarNegocio.subtitle}
                 </p>
             </div>
 
             <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-2xl relative">
                 <CardHeader>
-                    <CardTitle>Información General</CardTitle>
-                    <CardDescription>Estos datos ayudarán a la IA a entender mejor tu marca y tus productos.</CardDescription>
+                    <CardTitle>{t.configurarNegocio.infoGenTitle}</CardTitle>
+                    <CardDescription>{t.configurarNegocio.infoGenDesc}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Form {...form}>
@@ -301,10 +303,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Store className="w-4 h-4 text-violet-400" /> Nombre del Negocio
+                                                <Store className="w-4 h-4 text-violet-400" /> {t.configurarNegocio.nombreNegocioLabel}
                                             </FormLabel>
                                             <FormControl>
-                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-violet-500" placeholder="Ej. AngleMaster Store" {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-violet-500" placeholder={t.configurarNegocio.nombreNegocioPh} {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -316,10 +318,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <LinkIcon className="w-4 h-4 text-fuchsia-400" /> URL de Shopify
+                                                <LinkIcon className="w-4 h-4 text-fuchsia-400" /> {t.configurarNegocio.shopifyUrlLabel}
                                             </FormLabel>
                                             <FormControl>
-                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-fuchsia-500" placeholder="https://mitienda.myshopify.com" {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-fuchsia-500" placeholder={t.configurarNegocio.shopifyUrlPh} {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -331,10 +333,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <Target className="w-4 h-4 text-sky-400" /> Nicho o Categoría
+                                                <Target className="w-4 h-4 text-sky-400" /> {t.configurarNegocio.nichoLabel}
                                             </FormLabel>
                                             <FormControl>
-                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-sky-500" placeholder="Ej. Ropa deportiva, Tecnología, Salud..." {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-sky-500" placeholder={t.configurarNegocio.nichoPh} {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -346,10 +348,10 @@ export default function ConfigurarNegocioPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel className="flex items-center gap-2">
-                                                <MousePointerClick className="w-4 h-4 text-emerald-400" /> CTA Principal <span className="text-muted-foreground font-normal">(Opcional)</span>
+                                                <MousePointerClick className="w-4 h-4 text-emerald-400" /> {t.configurarNegocio.ctaLabel} <span className="text-muted-foreground font-normal">{t.configurarNegocio.opcional}</span>
                                             </FormLabel>
                                             <FormControl>
-                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-emerald-500" placeholder="Ej. Compra ahora, Descubre más" {...field} />
+                                                <Input className="bg-white/5 border-white/10 focus-visible:ring-emerald-500" placeholder={t.configurarNegocio.ctaPh} {...field} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -363,17 +365,17 @@ export default function ConfigurarNegocioPage() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="flex items-center gap-2">
-                                            <AlignLeft className="w-4 h-4 text-orange-400" /> Descripción del Producto o Servicio
+                                            <AlignLeft className="w-4 h-4 text-orange-400" /> {t.configurarNegocio.descLabel}
                                         </FormLabel>
                                         <FormControl>
                                             <Textarea
-                                                placeholder="Describe qué vendes, cuáles son sus beneficios principales y qué problema resuelve para tu cliente ideal."
+                                                placeholder={t.configurarNegocio.descPh}
                                                 className="resize-none h-32 bg-white/5 border-white/10 focus-visible:ring-orange-500"
                                                 {...field}
                                             />
                                         </FormControl>
                                         <FormDescription>
-                                            Sé lo más detallado posible. La IA usará esto para generar los ángulos.
+                                            {t.configurarNegocio.descHint}
                                         </FormDescription>
                                         <FormMessage />
                                     </FormItem>
@@ -384,16 +386,16 @@ export default function ConfigurarNegocioPage() {
 
                             <div className="pt-6 border-t border-white/10">
                                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-zinc-200">
-                                    <span className="text-blue-500">📸</span> Fotos de Producto
+                                    <span className="text-blue-500">📸</span> {t.configurarNegocio.fotosTitle}
                                 </h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    {renderPhotoSlot(0, "Principal")}
-                                    {renderPhotoSlot(1, "Detalle 1")}
-                                    {renderPhotoSlot(2, "Detalle 2")}
-                                    {renderPhotoSlot(3, "Detalle 3")}
+                                    {renderPhotoSlot(0, t.configurarNegocio.fotoPrinc)}
+                                    {renderPhotoSlot(1, t.configurarNegocio.fotoDet1)}
+                                    {renderPhotoSlot(2, t.configurarNegocio.fotoDet2)}
+                                    {renderPhotoSlot(3, t.configurarNegocio.fotoDet3)}
                                 </div>
                                 <p className="text-xs text-zinc-500 mt-3">
-                                    Sube la foto principal aquí. La IA la usará como referencia. (Máx 5MB)
+                                    {t.configurarNegocio.fotosHint}
                                 </p>
                             </div>
 
@@ -404,9 +406,9 @@ export default function ConfigurarNegocioPage() {
                                     className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-500 hover:to-pink-500 text-white font-semibold shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all px-8 py-6 rounded-full text-base border-0"
                                 >
                                     {isSaving ? (
-                                        <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Guardando...</span>
+                                        <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> {t.configurarNegocio.btnGuardando}</span>
                                     ) : (
-                                        <span className="flex items-center gap-2">Guardar Marca y Continuar <ArrowRight className="w-5 h-5 mt-0.5" /></span>
+                                        <span className="flex items-center gap-2">{t.configurarNegocio.btnGuardarContinuar} <ArrowRight className="w-5 h-5 mt-0.5" /></span>
                                     )}
                                 </Button>
                             </div>
