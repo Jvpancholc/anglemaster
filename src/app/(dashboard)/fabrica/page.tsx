@@ -41,6 +41,7 @@ export default function FabricaCreativaPage() {
     const [selectedAngleId, setSelectedAngleId] = useState<string>("");
     const [variantCount, setVariantCount] = useState<string>("4");
     const [generationStyle, setGenerationStyle] = useState<string>("brand");
+    const [generationModel, setGenerationModel] = useState<string>("sdxl");
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
@@ -141,6 +142,8 @@ export default function FabricaCreativaPage() {
         try {
             const angleObj = angles.find(a => a.id === selectedAngleId);
 
+            const token = await getToken({ template: 'supabase' });
+
             const payload = {
                 projectId: activeProjectId,
                 angleId: selectedAngleId,
@@ -151,16 +154,15 @@ export default function FabricaCreativaPage() {
                     ...projectContext,
                     angleText: angleObj?.text
                 },
-                freeStyle: generationStyle === "free"
+                freeStyle: generationStyle === "free",
+                generationModel,
+                supabaseToken: token // Pasado en el body para evitar que Clerk Middleware devuelva 307 Redirect Error
             };
-
-            const token = await getToken({ template: 'supabase' });
 
             const res = await fetch("/api/generate-creatives", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify(payload)
             });
@@ -377,6 +379,21 @@ export default function FabricaCreativaPage() {
                                 <SelectContent className="bg-zinc-900 border-white/10">
                                     <SelectItem value="brand" className="cursor-pointer">Seguir Identidad de Marca</SelectItem>
                                     <SelectItem value="free" className="cursor-pointer">Estilo Libre / Extravagante</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-3 md:col-span-2 lg:col-span-1">
+                            <label className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                                Modelo de Renderizado
+                            </label>
+                            <Select value={generationModel} onValueChange={setGenerationModel}>
+                                <SelectTrigger className="w-full bg-black/50 border-white/10 h-14 text-base focus:ring-cyan-500 rounded-xl">
+                                    <SelectValue placeholder="Modelo..." />
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-white/10">
+                                    <SelectItem value="flux-pro" className="cursor-pointer">Flux 1.1 Pro (Ultra Realista / Estilo Gemini)</SelectItem>
+                                    <SelectItem value="sdxl" className="cursor-pointer">SDXL (Rápido / Standard)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

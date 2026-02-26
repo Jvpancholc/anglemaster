@@ -70,7 +70,15 @@ export default function EstiloVisualPage() {
 
     const handleStyleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setStyleReferenceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+            const newFiles = Array.from(e.target.files);
+            setStyleReferenceFiles(prev => {
+                const combined = [...prev, ...newFiles];
+                if (combined.length > 2) {
+                    toast.warning("Solo puedes subir un máximo de 2 referencias. Se han descartado algunas.");
+                    return combined.slice(0, 2);
+                }
+                return combined;
+            });
         }
     };
 
@@ -79,9 +87,9 @@ export default function EstiloVisualPage() {
             const newFiles = Array.from(e.target.files);
             setFaceImageFiles(prev => {
                 const combined = [...prev, ...newFiles];
-                if (combined.length > 5) {
-                    toast.warning("Solo puedes subir un máximo de 5 rostros. Se han descartado algunos.");
-                    return combined.slice(0, 5);
+                if (combined.length > 4) {
+                    toast.warning("Solo puedes subir un máximo de 4 rostros. Se han descartado algunos.");
+                    return combined.slice(0, 4);
                 }
                 return combined;
             });
@@ -236,7 +244,7 @@ export default function EstiloVisualPage() {
                         <div className="space-y-4">
                             <div className="flex items-center gap-2">
                                 <ImagePlus className="w-5 h-5 text-pink-400" />
-                                <h3 className="font-semibold text-zinc-200">Referencias de Estilo</h3>
+                                <h3 className="font-semibold text-zinc-200">Referencias de Estilo <span className="text-xs text-zinc-500 font-normal">(Máx 2)</span></h3>
                             </div>
                             <p className="text-sm text-zinc-500">¿Tienes anuncios de la competencia o posts que te envuelven? Súbelos para calcar su esencia estética.</p>
 
@@ -271,7 +279,7 @@ export default function EstiloVisualPage() {
                         <div className="space-y-4">
                             <div className="flex items-center gap-2">
                                 <User className="w-5 h-5 text-sky-400" />
-                                <h3 className="font-semibold text-zinc-200">Rostro / Personaje Principal <span className="text-xs text-zinc-500 font-normal">(Máx 5)</span></h3>
+                                <h3 className="font-semibold text-zinc-200">Rostro / Personaje Principal <span className="text-xs text-zinc-500 font-normal">(Máx 4, Recomendado: 1)</span></h3>
                             </div>
                             <p className="text-sm text-zinc-500">Sube fotos frontales y claras de la persona que quieres que la IA posicione como el protagonista de tus artes.</p>
 

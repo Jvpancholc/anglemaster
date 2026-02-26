@@ -8,20 +8,18 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 export async function POST(req: Request) {
-    // Si la llamada viene del frontend, traemos el token de Clerk. Si viene de Qstash webhook, usamos el service key.
-    const authHeader = req.headers.get('authorization');
-    let supabase: any;
-    if (authHeader) {
-        supabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-            global: { headers: { Authorization: authHeader } }
-        });
-    } else {
-        supabase = createClient(supabaseUrl, supabaseServiceKey);
-    }
-
     try {
         const body = await req.json();
-        const { projectId, angleId, numVariants, context, settings, userId } = body;
+        const { projectId, angleId, numVariants, context, settings, userId, supabaseToken, generationModel } = body;
+
+        let supabase: any;
+        if (supabaseToken) {
+            supabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+                global: { headers: { Authorization: `Bearer ${supabaseToken}` } }
+            });
+        } else {
+            supabase = createClient(supabaseUrl, supabaseServiceKey);
+        }
 
         let variantsInt = parseInt(numVariants) || 1;
 
@@ -147,7 +145,8 @@ export async function POST(req: Request) {
         const payload = {
             creativeIds,
             prompt,
-            replicateKey: apiKey
+            replicateKey: apiKey,
+            generationModel
         };
 
         const targetUrl = process.env.NEXT_PUBLIC_APP_URL
