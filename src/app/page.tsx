@@ -14,6 +14,30 @@ export default async function LandingPage() {
 
     return (
         <div className="flex flex-col min-h-screen bg-black text-white selection:bg-pink-500/30">
+            {/* Promotional Banner (Only for unauthenticated users) */}
+            <SignedOut>
+                <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-center sm:px-6 lg:px-8 relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-[100%] animate-[shimmer_3s_infinite]" />
+
+                    <p className="text-sm font-semibold text-white relative z-10 mx-auto max-w-4xl flex flex-col sm:flex-row items-center justify-center gap-2">
+                        <span className="flex items-center gap-1">
+                            <Zap className="w-4 h-4 text-yellow-300 animate-pulse" />
+                            <span className="bg-white/20 px-2 py-0.5 rounded text-xs tracking-wider uppercase backdrop-blur-sm mr-1">Oferta Flash</span>
+                        </span>
+                        <span>
+                            Solo por tiempo limitado: la app creativa desde <strong className="text-yellow-300">$49.99/mensual</strong> con planes exclusivos.
+                        </span>
+                        <span className="hidden sm:inline-block mx-2 opacity-50">•</span>
+                        <SignUpButton fallbackRedirectUrl="/dashboard" mode="modal">
+                            <button className="underline decoration-white/50 underline-offset-4 hover:decoration-white transition-all font-bold group-hover:text-yellow-200">
+                                ¡Aprovecha ahora!
+                            </button>
+                        </SignUpButton>
+                    </p>
+                </div>
+            </SignedOut>
+
             {/* Nav */}
             <header className="flex items-center justify-between p-6 border-b border-white/5 bg-black/50 backdrop-blur-md sticky top-0 z-50">
                 <div className="flex items-center gap-2">
