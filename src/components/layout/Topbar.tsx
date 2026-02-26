@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import { UserButton } from "@clerk/nextjs";
 
 export const Topbar = () => {
     const router = useRouter();
     const pathname = usePathname();
     const { activeProjectId } = useProjectStore();
-    const isDashboard = pathname === "/";
+    const isDashboard = pathname === "/dashboard";
 
     return (
         <div className="flex items-center p-4 bg-zinc-950/60 backdrop-blur-xl border-b border-border/40 sticky top-0 z-50 justify-between">
@@ -52,10 +53,9 @@ export const Topbar = () => {
                         <span className="opacity-70 mr-1">Proyecto:</span> {activeProjectId.slice(0, 8)}...
                     </div>
                 )}
-                {/* Usaremos Clerk Component o un Avatar nativo más adelante */}
-                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-medium text-sm shadow-[0_0_15px_rgba(124,58,237,0.4)] ring-2 ring-primary/20">
-                    U
-                </div>
+
+                {/* Avatar and Account Management via Clerk */}
+                <UserButton afterSignOutUrl="/" />
             </div>
         </div>
     );

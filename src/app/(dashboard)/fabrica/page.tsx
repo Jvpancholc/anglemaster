@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Factory, Wand2, Download, Image as ImageIcon, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Factory, Wand2, Download, Image as ImageIcon, AlertTriangle, ArrowLeft, Loader2, Gauge } from "lucide-react";
 import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,50 +32,109 @@ const FALLBACK_ANGLES = [
 
 export default function FabricaCreativaPage() {
     const router = useRouter();
-    const { activeProjectId, projects } = useProjectStore();
+    const { getToken, userId } = useAuth();
+    const { user } = useUser();
+    const { activeProjectId, projects, settings } = useProjectStore();
     const [mounted, setMounted] = useState(false);
 
     const [angles, setAngles] = useState<{ id: string; text: string }[]>([]);
     const [selectedAngleId, setSelectedAngleId] = useState<string>("");
     const [variantCount, setVariantCount] = useState<string>("4");
+    const [generationStyle, setGenerationStyle] = useState<string>("brand");
 
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isFetching, setIsFetching] = useState(true);
     const [generatedImages, setGeneratedImages] = useState<string[]>([]);
     const [projectContext, setProjectContext] = useState<any>(null);
+    const [generationsLeft, setGenerationsLeft] = useState<number | 'Ilimitado'>(40);
+
+    const fetchAngles = async () => {
+        setIsFetching(true);
+        try {
+            if (!activeProjectId || !userId) return;
+
+            const token = await getToken({ template: 'supabase' });
+            if (!token) return;
+
+            const supabaseAuth = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                { global: { headers: { Authorization: `Bearer ${token}` } } }
+            );
+
+            const { data, error } = await supabaseAuth
+                .from('angles')
+                .select('*')
+                .eq('project_id', activeProjectId)
+                .eq('selected', true);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                const fetchedAngles = data.map(a => ({ id: a.id, text: a.angle_text }));
+                setAngles(fetchedAngles);
+                setSelectedAngleId(fetchedAngles[0].id);
+            } else {
+                setAngles([]);
+            }
+            // Fetch current limits too
+            const { data: apiKeyData } = await supabaseAuth
+                .from('api_keys')
+                .select('daily_generations, last_generation_date')
+                .eq('user_id', userId)
+                .single();
+
+            if (settings?.replicateKey) {
+                setGenerationsLeft('Ilimitado');
+            } else if (apiKeyData) {
+                const today = new Date().toISOString().split('T')[0];
+                if (apiKeyData.last_generation_date !== today) {
+                    setGenerationsLeft(40);
+                } else if (apiKeyData.daily_generations !== null) {
+                    setGenerationsLeft(apiKeyData.daily_generations);
+                }
+            }
+
+        } catch (error) {
+            console.error("Error fetching angles:", error);
+        } finally {
+            setIsFetching(false);
+        }
+    };
 
     useEffect(() => {
         setMounted(true);
         const project = activeProjectId ? projects.find(p => p.id === activeProjectId) : null;
 
-        if (project && project.angles && project.angles.length > 0) {
-            // Include ALL angles
-            setAngles(project.angles);
-            // Pre-select the first one that was "selected" previously, or just the first one
-            const previouslySelected = project.angles.find((a: any) => a.selected);
-            setSelectedAngleId(previouslySelected ? previouslySelected.id : project.angles[0].id);
-
-            // Collect context for the prompt
+        if (project) {
             setProjectContext({
                 creativeFormats: project.creativeFormats,
                 visualStyle: project.visualStyle,
                 identity: project.identity,
                 analysis: project.analysis
             });
+            fetchAngles();
         } else {
             // FALLBACK DUMMY DATA OR NO ANGLES
+            setAngles(FALLBACK_ANGLES);
+            setSelectedAngleId(FALLBACK_ANGLES[0].id);
+            setProjectContext(FALLBACK_CONTEXT);
+            setIsFetching(false);
             if (!activeProjectId) {
-                setAngles(FALLBACK_ANGLES);
-                setSelectedAngleId(FALLBACK_ANGLES[0].id);
-                setProjectContext(FALLBACK_CONTEXT);
                 toast.info("Modo demostración: utilizando datos de ejemplo porque no hay proyecto activo.");
-            } else {
-                setAngles([]);
             }
         }
-    }, [activeProjectId, projects]);
+    }, [activeProjectId, projects, userId]);
 
     const handleGenerate = async () => {
         if (!selectedAngleId) return;
+
+        const count = parseInt(variantCount) || 1;
+        if (generationsLeft !== 'Ilimitado' && generationsLeft < count) {
+            toast.error("Límite diario excedido. Actualiza tu plan o añade tu propia API Key en Preferencias.");
+            return;
+        }
+
         setIsGenerating(true);
         setGeneratedImages([]);
 
@@ -82,12 +143,15 @@ export default function FabricaCreativaPage() {
 
             const payload = {
                 projectId: activeProjectId || "demo-project",
+                userId,
                 angleId: selectedAngleId,
                 numVariants: variantCount,
+                settings, // Pass global settings (API Keys)
                 context: {
                     ...projectContext,
                     angleText: angleObj?.text
-                }
+                },
+                freeStyle: generationStyle === "free"
             };
 
             const res = await fetch("/api/generate-creatives", {
@@ -96,23 +160,69 @@ export default function FabricaCreativaPage() {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) {
-                throw new Error("Error en la respuesta del servidor");
-            }
-
             const data = await res.json();
 
-            if (data.error) {
-                throw new Error(data.error);
+            if (!res.ok || data.error) {
+                throw new Error(data.error || "Error en la respuesta del servidor");
             }
 
-            setGeneratedImages(data.images || []);
-            toast.success("Creativos generados existosamente.");
+            // INICIAMOS POLLING (Cola Serverless)
+            if (data.queued && data.creativeIds) {
+                toast.success("Trabajo encolado. Generando en segundo plano...", { icon: '⏳' });
+
+                let attempts = 0;
+                const maxAttempts = 60; // 3 minutos máximo (60 * 3s)
+
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const statusRes = await fetch(`/api/creatives/status?ids=${data.creativeIds.join(',')}`);
+                        const statusData = await statusRes.json();
+
+                        if (statusData.success && statusData.statuses) {
+                            const statusesObj = statusData.statuses;
+                            const allCompleted = Object.values(statusesObj).every((s: any) => s.status === 'completed');
+
+                            if (allCompleted || attempts >= maxAttempts) {
+                                clearInterval(pollInterval);
+
+                                const finalUrls: string[] = Object.values(statusesObj)
+                                    .map((s: any) => s.url)
+                                    .filter(Boolean) as string[];
+
+                                setGeneratedImages(finalUrls);
+
+                                if (generationsLeft !== 'Ilimitado') {
+                                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - count : prev);
+                                }
+
+                                setIsGenerating(false);
+
+                                if (finalUrls.length > 0) {
+                                    toast.success("¡Creativos generados y cacheados exitosamente!", { icon: '🎨' });
+                                } else {
+                                    toast.error("Hubo un timeout o fallo en la generación asincrónica.");
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Polling error", e);
+                    }
+                }, 3000); // 3 segundos
+            } else {
+                // Fallback por si devuelve imágenes de forma síncrona (mock)
+                setGeneratedImages(data.images || []);
+                if (generationsLeft !== 'Ilimitado') {
+                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - count : prev);
+                }
+                setIsGenerating(false);
+                toast.success("Creativos generados existosamente.");
+            }
+
         } catch (error: any) {
             console.error("Generación fallida:", error);
-            toast.error(error.message || "Error al conectar con la API de generación.");
-        } finally {
             setIsGenerating(false);
+            toast.error(error.message || "Error al conectar con la API de generación.");
         }
     };
 
@@ -154,6 +264,15 @@ export default function FabricaCreativaPage() {
 
     if (!mounted) return null;
 
+    if (isFetching) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-4" />
+                <p className="text-zinc-500">Cargando ángulos y contexto...</p>
+            </div>
+        );
+    }
+
     if (angles.length === 0 && activeProjectId) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center animate-in zoom-in duration-500">
@@ -186,6 +305,19 @@ export default function FabricaCreativaPage() {
                 <p className="text-zinc-400 text-lg max-w-2xl">
                     Combina tus formatos, estilo visual y ángulos guardados para renderizar anuncios listos para publicar.
                 </p>
+                <div className="flex flex-wrap items-center gap-3 mt-4">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm font-medium text-zinc-300">
+                        <Gauge className={`w-4 h-4 ${generationsLeft === 'Ilimitado' || generationsLeft > 10 ? 'text-emerald-400' : 'text-amber-400'}`} />
+                        <span>Límite Diario: </span>
+                        <strong className={generationsLeft === 'Ilimitado' || generationsLeft > 10 ? "text-white" : "text-amber-400"}>
+                            {generationsLeft === 'Ilimitado' ? 'Ilimitado' : `${generationsLeft} restantes`}
+                        </strong>
+                    </div>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm font-medium text-blue-200">
+                        <AlertTriangle className="w-4 h-4 text-blue-400" />
+                        <span>Aviso: Las imágenes generadas se eliminan automáticamente tras <strong>7 días</strong>. ¡Descárgalas a tiempo!</span>
+                    </div>
+                </div>
             </div>
 
             <Card className="bg-zinc-950/60 border-white/10 shadow-2xl relative overflow-hidden">
@@ -228,19 +360,36 @@ export default function FabricaCreativaPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        <div className="space-y-3 md:col-span-2 lg:col-span-1">
+                            <label className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
+                                Dirección de Arte
+                            </label>
+                            <Select value={generationStyle} onValueChange={setGenerationStyle}>
+                                <SelectTrigger className="w-full bg-black/50 border-white/10 h-14 text-base focus:ring-cyan-500 rounded-xl">
+                                    <SelectValue placeholder="Estilo..." />
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-white/10">
+                                    <SelectItem value="brand" className="cursor-pointer">Seguir Identidad de Marca</SelectItem>
+                                    <SelectItem value="free" className="cursor-pointer">Estilo Libre / Extravagante</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div className="pt-4 flex justify-between items-center">
                         <p className="text-xs text-zinc-500 flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                            Renderizando usando modelo High-Res. Consumirá {variantCount} créditos.
+                            {generationsLeft === 'Ilimitado'
+                                ? "Renderizando vía Personal Key."
+                                : `Renderizando usando modelo High-Res. Consumirá ${variantCount} créditos.`}
                         </p>
                         <Button
                             onClick={handleGenerate}
-                            disabled={isGenerating}
-                            className={`px-8 py-6 rounded-full font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all ${isGenerating
-                                    ? "bg-zinc-800 text-zinc-400 border border-white/5"
-                                    : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white"
+                            disabled={isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))}
+                            className={`px-8 py-6 rounded-full font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all ${isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))
+                                ? "bg-zinc-800 text-zinc-400 border border-white/5"
+                                : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white"
                                 }`}
                         >
                             {isGenerating ? (

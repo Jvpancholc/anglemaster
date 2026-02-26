@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, FileText, BrainCircuit, ArrowRight, Dna, FileQuestion, Key, Sparkles } from "lucide-react";
+import { UploadCloud, FileText, BrainCircuit, ArrowRight, Dna, FileQuestion, Key, Sparkles, Loader2 } from "lucide-react";
 import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,8 +14,13 @@ import { Label } from "@/components/ui/label";
 
 export default function AnalisisIAPage() {
     const router = useRouter();
+    const { getToken } = useAuth();
+    const { user } = useUser();
     const { activeProjectId, projects, updateProject } = useProjectStore();
     const [mounted, setMounted] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [product, setProduct] = useState("");
     const [avatar, setAvatar] = useState("");
@@ -38,15 +45,72 @@ export default function AnalisisIAPage() {
         }
     }, [activeProjectId, projects, router]);
 
-    const handleSave = () => {
-        if (!activeProjectId) return;
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-        updateProject(activeProjectId, {
-            analysis: { product, avatar, mup, ums, promise }
-        });
+        setIsAnalyzing(true);
+        const toastId = toast.loading("Analizando documento con IA...");
 
-        toast.success("Estrategia y ADN guardados.");
-        router.push("/angulos");
+        // Simulamos el retraso de análisis de OpenAI
+        setTimeout(() => {
+            setProduct("Masterclass de E-commerce y Ventas Digitales Avanzadas");
+            setAvatar("Emprendedores digitales de 25-45 años que se sienten abrumados por los costos de anuncios, desean estabilidad en sus ventas y buscan un método sistémico en lugar de trucos mágicos.");
+            setMup("Los métodos tradicionales enseñan a crear anuncios bonitos pero no a convertirlos en un embudo rentable. Consumen presupuesto rápido sin retorno claro.");
+            setUms("El Sistema 'AngleMaster': Un enfoque basado en psicología de cliente que testea ángulos baratos antes de escalar presupuesto, garantizando rentabilidad.");
+            setPromise("Transformar tu tienda online en una máquina predecible de ventas, multiplicando tu ROAS en menos de 30 días sin aumentar tu inversión publicitaria inicial.");
+
+            toast.success("Análisis completado exitosamente", { id: toastId });
+            setIsAnalyzing(false);
+            if (e.target) e.target.value = '';
+        }, 3000);
+    };
+
+    const handleSave = async () => {
+        if (!activeProjectId || !user) {
+            toast.error("Debes iniciar sesión y seleccionar un proyecto.");
+            return;
+        }
+
+        setIsSaving(true);
+        const toastId = toast.loading("Guardando estrategia de negocio...");
+
+        try {
+            // Guardar localmente
+            updateProject(activeProjectId, {
+                analysis: { product, avatar, mup, ums, promise }
+            });
+
+            // Guardar en Supabase
+            const token = await getToken({ template: 'supabase' });
+            if (!token) throw new Error("No se pudo obtener el token de autenticación");
+
+            const supabaseAuth = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                { global: { headers: { Authorization: `Bearer ${token}` } } }
+            );
+
+            const adn_json = { product, avatar, mup, ums, promise };
+
+            const { error } = await supabaseAuth
+                .from('analysis')
+                .upsert({
+                    project_id: activeProjectId,
+                    user_id: user.id,
+                    adn: adn_json
+                }, { onConflict: 'project_id' });
+
+            if (error) throw error;
+
+            toast.success("Estrategia y ADN guardados.", { id: toastId });
+            router.push("/angulos");
+        } catch (error: any) {
+            console.error("Error guardando ADN:", error);
+            toast.error(`Error guardando en BD: ${error.message}`, { id: toastId });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (!mounted) return null;
@@ -80,8 +144,20 @@ export default function AnalisisIAPage() {
                             <p className="text-zinc-500 mb-8 max-w-[250px]">
                                 Soporta PDF, DOCX, TXT e imágenes. Máximo 100MB por archivo.
                             </p>
-                            <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-full px-8 py-5">
-                                <FileText className="w-4 h-4 mr-2" /> Seleccionar Archivos
+                            <input
+                                type="file"
+                                className="hidden"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept=".pdf,.doc,.docx,.txt,image/*"
+                            />
+                            <Button
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isAnalyzing}
+                                className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-full px-8 py-5"
+                            >
+                                {isAnalyzing ? "Analizando..." : <><FileText className="w-4 h-4 mr-2" /> Seleccionar Archivos</>}
                             </Button>
                         </CardContent>
                     </Card>
@@ -178,9 +254,11 @@ export default function AnalisisIAPage() {
                         <div className="p-6 border-t border-white/5 bg-black/20 flex justify-end">
                             <Button
                                 onClick={handleSave}
+                                disabled={isSaving}
                                 className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base"
                             >
-                                Confirmar Estrategia <ArrowRight className="w-5 h-5 ml-2" />
+                                {isSaving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : "Confirmar Estrategia"}
+                                {!isSaving && <ArrowRight className="w-5 h-5 ml-2" />}
                             </Button>
                         </div>
                     </Card>

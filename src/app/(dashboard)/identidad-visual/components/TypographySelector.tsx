@@ -69,40 +69,60 @@ export function TypographySelector({ selectedFont, onSelectFont }: TypographySel
             </Tabs>
 
             <ScrollArea className="h-[280px] w-full rounded-md border border-white/5 bg-black/40 p-4">
-                {filteredFonts.length === 0 ? (
-                    <p className="text-center text-zinc-500 py-10">No se encontraron fuentes.</p>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                        {filteredFonts.map((font) => {
-                            const fontUrl = `https://fonts.googleapis.com/css2?family=${font.name.replace(/ /g, '+')}&display=swap`;
-
-                            return (
-                                <div
-                                    key={font.name}
-                                    onClick={() => onSelectFont(font.name)}
-                                    className={`relative p-4 rounded-xl border cursor-pointer transition-all flex flex-col items-center justify-center text-center group ${selectedFont === font.name
-                                        ? "bg-orange-500/10 border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.15)] ring-1 ring-orange-500"
-                                        : "bg-zinc-900 border-white/5 hover:bg-zinc-800 hover:border-white/20"
-                                        }`}
-                                    style={{ minHeight: "100px" }}
-                                >
-                                    {selectedFont === font.name && (
-                                        <div className="absolute top-2 right-2 bg-orange-500 text-white rounded-full">
-                                            <CheckCircle className="w-4 h-4" />
-                                        </div>
-                                    )}
-                                    <link href={fontUrl} rel="stylesheet" />
-                                    <span
-                                        className={`text-2xl mb-2 transition-colors ${selectedFont === font.name ? "text-orange-400" : "text-zinc-300"}`}
-                                        style={{ fontFamily: `"${font.name}", sans-serif` }}
-                                    >
-                                        Ag
-                                    </span>
-                                    <p className="text-[11px] font-medium text-zinc-400 truncate w-full px-1">{font.name}</p>
-                                </div>
-                            );
-                        })}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {/* Botón Automático */}
+                    <div
+                        onClick={() => onSelectFont("auto")}
+                        className={`relative p-4 rounded-xl border cursor-pointer transition-all flex flex-col items-center justify-center text-center group ${selectedFont === "auto" || !selectedFont
+                            ? "bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.2)] ring-1 ring-cyan-500"
+                            : "bg-zinc-900 border-white/5 hover:bg-zinc-800 hover:border-white/20"
+                            }`}
+                        style={{ minHeight: "100px" }}
+                    >
+                        {(selectedFont === "auto" || !selectedFont) && (
+                            <div className="absolute top-2 right-2 bg-cyan-500 text-white rounded-full">
+                                <CheckCircle className="w-4 h-4" />
+                            </div>
+                        )}
+                        <Sparkles className={`w-8 h-8 mb-2 transition-colors ${selectedFont === "auto" || !selectedFont ? "text-cyan-400" : "text-zinc-500"}`} />
+                        <span className={`text-sm font-bold transition-colors ${selectedFont === "auto" || !selectedFont ? "text-white" : "text-zinc-300"}`}>
+                            Automática
+                        </span>
+                        <p className="text-[10px] text-zinc-400 mt-1 pb-1">La IA elige según tu nicho</p>
                     </div>
+
+                    {filteredFonts.map((font) => {
+                        const fontUrl = `https://fonts.googleapis.com/css2?family=${font.name.replace(/ /g, '+')}&display=swap`;
+
+                        return (
+                            <div
+                                key={font.name}
+                                onClick={() => onSelectFont(font.name)}
+                                className={`relative p-4 rounded-xl border cursor-pointer transition-all flex flex-col items-center justify-center text-center group ${selectedFont === font.name
+                                    ? "bg-orange-500/10 border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.15)] ring-1 ring-orange-500"
+                                    : "bg-zinc-900 border-white/5 hover:bg-zinc-800 hover:border-white/20"
+                                    }`}
+                                style={{ minHeight: "100px" }}
+                            >
+                                {selectedFont === font.name && (
+                                    <div className="absolute top-2 right-2 bg-orange-500 text-white rounded-full">
+                                        <CheckCircle className="w-4 h-4" />
+                                    </div>
+                                )}
+                                <link href={fontUrl} rel="stylesheet" />
+                                <span
+                                    className={`text-2xl mb-2 transition-colors ${selectedFont === font.name ? "text-orange-400" : "text-zinc-300"}`}
+                                    style={{ fontFamily: `"${font.name}", sans-serif` }}
+                                >
+                                    Ag
+                                </span>
+                                <p className="text-[11px] font-medium text-zinc-400 truncate w-full px-1">{font.name}</p>
+                            </div>
+                        );
+                    })}
+                </div>
+                {filteredFonts.length === 0 && (
+                    <p className="text-center text-zinc-500 py-10">No se encontraron más fuentes para esta categoría.</p>
                 )}
             </ScrollArea>
         </div>

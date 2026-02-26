@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { AppSync } from "@/components/layout/AppSync";
 
 const DashboardLayout = ({
     children
@@ -12,6 +13,7 @@ const DashboardLayout = ({
                 <Sidebar />
             </div>
             <main className="md:pl-72 h-full flex flex-col">
+                <AppSync />
                 <Topbar />
                 <div className="p-8 flex-1">
                     {children}

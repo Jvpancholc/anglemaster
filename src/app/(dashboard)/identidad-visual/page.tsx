@@ -1,91 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Type, Palette, ArrowRight, Loader2, Image as ImageIcon, MessageSquare, Crop, Sparkles } from "lucide-react";
-import { useProjectStore } from "@/lib/store";
-import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
-import { TypographySelector } from "./components/TypographySelector";
+import { toast } from "sonner";
+import { useProjectStore } from "@/lib/store";
 import { LogoEditorModal } from "./components/LogoEditorModal";
-import { AILogoGeneratorModal } from "./components/AILogoGeneratorModal";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl || "https://mock.supabase.co", supabaseAnonKey || "mock-key");
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Palette, Type, Image as ImageIcon, Sparkles, Save, Wand2, UploadCloud, UserCircle, ImagePlus } from "lucide-react";
 
 export default function IdentidadVisualPage() {
     const router = useRouter();
-    const { activeProjectId, projects, updateProject } = useProjectStore();
-    const [mounted, setMounted] = useState(false);
+    const { getToken } = useAuth();
+    const { user } = useUser();
+    const { activeProjectId } = useProjectStore();
 
-    const [primaryColor, setPrimaryColor] = useState("#6366f1");
-    const [secondaryColor, setSecondaryColor] = useState("#a855f7");
-    const [typography, setTypography] = useState("");
+    const [primaryColor, setPrimaryColor] = useState("#6366F1");
+    const [secondaryColor, setSecondaryColor] = useState("#A855F7");
+    const [selectedFont, setSelectedFont] = useState("Inter");
     const [slogan, setSlogan] = useState("");
     const [includeSlogan, setIncludeSlogan] = useState(false);
-
     const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [logoPreview, setLogoPreview] = useState<string>("");
-    const [logoUrl, setLogoUrl] = useState<string>("");
-
-    // Modal Crop states
-    const [isEditorOpen, setIsEditorOpen] = useState(false);
-    const [pendingImage, setPendingImage] = useState<string>("");
-    const [pendingFile, setPendingFile] = useState<File | null>(null);
-
-    // Modal AI Generator states
-    const [isAIGeneratorOpen, setIsAIGeneratorOpen] = useState(false);
-
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [pendingImage, setPendingImage] = useState<string | null>(null);
+
+    const [styleReferenceFiles, setStyleReferenceFiles] = useState<File[]>([]);
+    const [faceImageFiles, setFaceImageFiles] = useState<File[]>([]);
 
     useEffect(() => {
-        setMounted(true);
         if (!activeProjectId) {
-            router.push("/");
+            toast.error("Por favor, crea o selecciona un proyecto primero.");
+            router.push("/dashboard");
+        }
+    }, [activeProjectId, router]);
+
+    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error("El archivo excede el tamaño máximo permitido (2MB).");
             return;
         }
-
-        const project = projects.find(p => p.id === activeProjectId);
-        if (project) {
-            setPrimaryColor(project.identity?.primaryColor || "#6366f1");
-            setSecondaryColor(project.identity?.secondaryColor || "#a855f7");
-            setTypography(project.identity?.typography || "");
-            setSlogan(project.identity?.slogan || "");
-            setIncludeSlogan(project.identity?.includeSlogan || false);
-
-            const existingLogoUrl = project.identity?.logoUrl;
-            if (existingLogoUrl) {
-                setLogoUrl(existingLogoUrl);
-                setLogoPreview(existingLogoUrl);
-            }
-        }
-    }, [activeProjectId, projects, router]);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                toast.error("El archivo excede el tamaño máximo permitido (2MB).");
-                return;
-            }
-            // Open editor modal
-            setPendingImage(URL.createObjectURL(file));
-            setPendingFile(file);
-            setIsEditorOpen(true);
-
-            // Clear input value so selecting the same file triggers onChange again
-            e.target.value = "";
-        }
+        setPendingImage(URL.createObjectURL(file));
+        setPendingFile(file);
+        setIsEditorOpen(true);
+        e.target.value = "";
     };
 
     const handleSaveCrop = (croppedFile: File) => {
         setLogoFile(croppedFile);
         setLogoPreview(URL.createObjectURL(croppedFile));
+        setIsEditorOpen(false);
     };
 
     const handleSkipCrop = () => {
@@ -97,356 +73,432 @@ export default function IdentidadVisualPage() {
     };
 
     const handleAISelectLogo = async (url: string) => {
-        try {
-            const res = await fetch(url);
-            const blob = await res.blob();
-            const file = new File([blob], `ai_generated_logo_${Date.now()}.png`, { type: blob.type });
+        setLogoPreview(url);
+        setLogoUrl(url);
+    };
 
-            // Pass to crop modal
-            setPendingImage(URL.createObjectURL(file));
-            setPendingFile(file);
-            setIsEditorOpen(true);
-        } catch (err) {
-            console.warn("Could not fetch the URL directly due to CORS, saving direct URL visually.", err);
-            // Fallback: Just set the URL directly as if they uploaded it.
-            setLogoPreview(url);
-            setLogoUrl(url);
+    const handleStyleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setStyleReferenceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+        }
+    };
+
+    const handleFaceFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const newFiles = Array.from(e.target.files);
+            if (faceImageFiles.length + newFiles.length > 5) {
+                toast.error("Puedes subir un máximo de 5 fotos de rostro.");
+                return;
+            }
+            setFaceImageFiles(prev => [...prev, ...newFiles]);
         }
     };
 
     const handleSave = async () => {
-        if (!activeProjectId) return;
-        setIsSaving(true);
+        if (!activeProjectId) {
+            toast.error("No hay un proyecto activo");
+            return;
+        }
+        if (!user) {
+            toast.error("Usuario no autenticado");
+            return;
+        }
 
-        const finalTypography = typography || "Inter"; // Fallback to Inter if empty
-        let finalLogoUrl = logoUrl;
+        setIsSaving(true);
+        const toastId = toast.loading("Guardando identidad visual...");
 
         try {
-            // Attempt to initialize bucket automatically before interacting with storage
-            if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
-                try {
-                    await fetch('/api/init-bucket', { method: 'POST' });
-                } catch (e) {
-                    // Ignore, we will handle the actual upload error if it fails
-                }
-            }
+            const token = await getToken({ template: "supabase" });
+            if (!token) throw new Error("No se pudo obtener el token de autenticación");
 
+            const supabaseAuth = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                { global: { headers: { Authorization: `Bearer ${token}` } } }
+            );
+
+            // Intentar auto-crear buckets 
+            try { await fetch('/api/init-bucket', { method: 'POST' }); } catch (e) { }
+
+            let finalLogoUrl = logoUrl;
+
+            // Upload photo
             if (logoFile) {
-                if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
-                    const fileExt = logoFile.name.split('.').pop();
-                    const fileName = `${activeProjectId}/${Date.now()}_logo.${fileExt}`;
+                const fileExt = logoFile.name.split(".").pop();
+                const fileName = `${activeProjectId}/${Date.now()}_logo.${fileExt}`;
+                const { error: uploadError } = await supabaseAuth.storage
+                    .from("logos")
+                    .upload(fileName, logoFile, { upsert: true });
+                if (uploadError) throw new Error(`Error al subir logo: ${uploadError.message}`);
 
-                    const { data, error } = await supabase.storage
-                        .from('logos')
-                        .upload(fileName, logoFile, {
-                            upsert: true,
-                            contentType: logoFile.type
-                        });
+                const { data: publicUrlData } = supabaseAuth.storage.from("logos").getPublicUrl(fileName);
+                finalLogoUrl = publicUrlData.publicUrl;
+            }
 
-                    if (error) {
-                        console.error("Supabase Storage Error:", error);
-                        const msg = error.message.toLowerCase();
-                        if (msg.includes('bucket') && msg.includes('not found')) {
-                            toast.error("El bucket 'logos' no existe en Supabase y no pudo ser creado automáticamente.", { duration: 5000 });
-                            toast.info("Por favor, ve al Dashboard de Supabase > Storage y crea un bucket Público llamado 'logos'.", {
-                                duration: 15000,
-                            });
-                        } else {
-                            toast.error(`Error al subir imagen: ${error.message}`);
-                        }
-                        setIsSaving(false);
-                        return; // Stop execution
-                    }
+            // Upload Style References
+            const uploadedStyleUrls: string[] = [];
+            for (const file of styleReferenceFiles) {
+                const fileExt = file.name.split(".").pop();
+                const fileName = `${activeProjectId}/${Date.now()}_style_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const { error: uploadError } = await supabaseAuth.storage
+                    .from("style-references")
+                    .upload(fileName, file, { upsert: true });
 
-                    const { data: publicUrlData } = supabase.storage
-                        .from('logos')
-                        .getPublicUrl(fileName);
-
-                    finalLogoUrl = publicUrlData.publicUrl;
+                if (!uploadError) {
+                    const { data } = supabaseAuth.storage.from("style-references").getPublicUrl(fileName);
+                    uploadedStyleUrls.push(data.publicUrl);
                 } else {
-                    toast.info("Modo demostración: Supabase no configurado, guardando URL local.");
-                    finalLogoUrl = logoPreview;
+                    console.error("Error subiendo referencia de estilo:", uploadError);
                 }
             }
 
-            if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
-                // Get the authenticated user
-                const { data: { user } } = await supabase.auth.getUser();
+            // Upload Face Images
+            const uploadedFaceUrls: string[] = [];
+            for (const file of faceImageFiles) {
+                const fileExt = file.name.split(".").pop();
+                const fileName = `${activeProjectId}/${Date.now()}_face_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                const { error: uploadError } = await supabaseAuth.storage
+                    .from("face-images")
+                    .upload(fileName, file, { upsert: true });
 
-                const { error: dbError } = await supabase
-                    .from('brand_identity')
-                    .upsert({
-                        project_id: activeProjectId,
-                        user_id: user?.id, // CRITICAL FIX FOR RLS
-                        logo_url: finalLogoUrl || null,
-                        primary_color: primaryColor,
-                        secondary_color: secondaryColor,
-                        font: finalTypography,
-                        slogan: includeSlogan ? slogan : "", // Only save slogan if enabled
-                        include_slogan: includeSlogan
-                    }, { onConflict: 'project_id' });
-
-                if (dbError) {
-                    console.error("No se pudo insertar en la tabla brand_identity:", dbError);
-                    toast.error(`Error guardando datos en base de datos: ${dbError.message}`);
-                    setIsSaving(false);
-                    return; // Stop execution on DB error so they don't get the success toast
+                if (!uploadError) {
+                    const { data } = supabaseAuth.storage.from("face-images").getPublicUrl(fileName);
+                    uploadedFaceUrls.push(data.publicUrl);
+                } else {
+                    console.error("Error subiendo foto de rostro:", uploadError);
                 }
             }
 
-            updateProject(activeProjectId, {
-                identity: {
-                    ...projects.find(p => p.id === activeProjectId)?.identity,
-                    primaryColor,
-                    secondaryColor,
-                    typography: finalTypography,
-                    slogan,
-                    includeSlogan,
-                    logoUrl: finalLogoUrl
-                } as any
-            });
+            const dataToSave = {
+                project_id: activeProjectId,
+                user_id: user.id,
+                logo_url: finalLogoUrl,
+                primary_color: primaryColor,
+                secondary_color: secondaryColor,
+                font: selectedFont,
+                slogan: slogan,
+                include_slogan: includeSlogan,
+                style_references: uploadedStyleUrls,
+                face_images: uploadedFaceUrls
+            };
 
-            setLogoUrl(finalLogoUrl);
+            const { error } = await supabaseAuth
+                .from("brand_identity")
+                .upsert(dataToSave, { onConflict: "project_id" });
 
-            toast.success("Identidad visual guardada exitosamente");
+            if (error) throw error;
 
+            toast.success("¡Identidad visual guardada con éxito!", { id: toastId });
+            router.push("/formato-creativo");
         } catch (error: any) {
-            console.error("Save error:", error);
-            toast.error(error.message || "Ocurrió un error inesperado al guardar.");
+            console.error("Error al guardar:", error);
+            toast.error(error.message || "Error al guardar la identidad visual", { id: toastId });
         } finally {
             setIsSaving(false);
         }
     };
 
-    if (!mounted) return null;
-
     return (
-        <div className="flex flex-col gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+        <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+
+            <div className="text-center sm:text-left flex flex-col items-center sm:items-start p-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-xs text-fuchsia-400 font-medium mb-4">
+                    <Palette className="w-3.5 h-3.5" />
+                    Kit de Marca
+                </div>
+                <h1 className="text-4xl font-bold tracking-tight mb-2">
+                    Identidad <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-purple-500">Visual</span>
+                </h1>
+                <p className="text-zinc-400 text-lg max-w-2xl">
+                    Define la caja de herramientas de tu marca. Estos elementos guiarán todas las creaciones que la IA realice para tu cuenta.
+                </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Columna Izquierda: Logo y Slogan */}
+                <div className="lg:col-span-4 space-y-6">
+                    <Card className="bg-zinc-950/60 border-white/10 shadow-2xl relative overflow-hidden group hover:border-fuchsia-500/30 transition-all duration-500">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <ImageIcon className="w-24 h-24" />
+                        </div>
+                        <CardHeader className="border-b border-white/5 pb-4">
+                            <CardTitle className="text-xl text-white flex items-center gap-2">
+                                <ImageIcon className="w-5 h-5 text-fuchsia-400" />
+                                Logo Principal
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-white/10 rounded-xl bg-black/40 hover:bg-black/60 transition-colors relative group/upload">
+                                {logoPreview ? (
+                                    <div className="relative w-full aspect-square max-h-[160px] flex items-center justify-center">
+                                        <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain drop-shadow-lg" />
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-4">
+                                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3">
+                                            <UploadCloud className="w-8 h-8 text-zinc-500" />
+                                        </div>
+                                        <span className="text-sm text-zinc-400">Sube tu logo (PNG, JPG)</span>
+                                    </div>
+                                )}
+
+                                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm opacity-0 group-hover/upload:opacity-100 flex flex-col items-center justify-center gap-3 transition-opacity">
+                                    <Button variant="outline" size="sm" className="bg-white/10 border-white/20 text-white" onClick={() => document.getElementById("logo-upload")?.click()}>
+                                        Cambiar Logo
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="text-white hover:bg-white/20" onClick={() => setIsEditorOpen(true)} disabled={!logoFile && !logoPreview}>
+                                        Ajustar Recorte
+                                    </Button>
+                                </div>
+                                <input
+                                    id="logo-upload"
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleLogoChange}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-zinc-950/60 border-white/10 shadow-lg">
+                        <CardHeader className="border-b border-white/5 pb-4">
+                            <CardTitle className="text-lg text-white flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-amber-400" />
+                                Slogan
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-4">
+                            <Textarea
+                                value={slogan}
+                                onChange={(e) => setSlogan(e.target.value)}
+                                placeholder="Ej. El futuro del comercio..."
+                                className="bg-black/40 border-white/10 resize-none h-20 focus-visible:ring-fuchsia-500 text-zinc-200 rounded-xl"
+                            />
+                            <div className="flex items-center space-x-3 bg-white/5 p-3 rounded-lg border border-white/5">
+                                <Checkbox
+                                    id="include-slogan"
+                                    checked={includeSlogan}
+                                    onCheckedChange={(checked) => setIncludeSlogan(checked as boolean)}
+                                    className="data-[state=checked]:bg-fuchsia-500 data-[state=checked]:text-white border-white/20"
+                                />
+                                <Label htmlFor="include-slogan" className="text-sm text-zinc-300 cursor-pointer">
+                                    Mostrar frase en anuncios
+                                </Label>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Columna Derecha: Colores y Tipografía */}
+                <div className="lg:col-span-8 flex flex-col gap-6">
+                    <Card className="bg-zinc-950/60 border-white/10 shadow-2xl relative">
+                        <CardHeader className="border-b border-white/5 pb-4">
+                            <CardTitle className="text-xl text-white flex items-center gap-2">
+                                <Palette className="w-5 h-5 text-indigo-400" />
+                                Paleta Corporativa
+                            </CardTitle>
+                            <CardDescription>Esta paleta dictará la interfaz de los creativos.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                                <Label className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Color Primario</Label>
+                                <div className="flex gap-3">
+                                    <div className="relative group">
+                                        <div className="w-14 h-14 rounded-xl border-2 border-white/20 shadow-lg overflow-hidden group-hover:scale-105 transition-transform" style={{ backgroundColor: primaryColor }}>
+                                            <input
+                                                type="color"
+                                                value={primaryColor}
+                                                onChange={(e) => setPrimaryColor(e.target.value)}
+                                                className="absolute inset-[-10px] w-20 h-20 opacity-0 cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+                                    <Input
+                                        type="text"
+                                        value={primaryColor}
+                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                        className="flex-1 bg-black/40 border-white/10 font-mono text-center text-lg h-14 rounded-xl focus-visible:ring-indigo-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Label className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Color Secundario</Label>
+                                <div className="flex gap-3">
+                                    <div className="relative group">
+                                        <div className="w-14 h-14 rounded-xl border-2 border-white/20 shadow-lg overflow-hidden group-hover:scale-105 transition-transform" style={{ backgroundColor: secondaryColor }}>
+                                            <input
+                                                type="color"
+                                                value={secondaryColor}
+                                                onChange={(e) => setSecondaryColor(e.target.value)}
+                                                className="absolute inset-[-10px] w-20 h-20 opacity-0 cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+                                    <Input
+                                        type="text"
+                                        value={secondaryColor}
+                                        onChange={(e) => setSecondaryColor(e.target.value)}
+                                        className="flex-1 bg-black/40 border-white/10 font-mono text-center text-lg h-14 rounded-xl focus-visible:ring-purple-500"
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-zinc-950/60 border-white/10 shadow-2xl flex-1 flex flex-col justify-between">
+                        <div>
+                            <CardHeader className="border-b border-white/5 pb-4">
+                                <CardTitle className="text-xl text-white flex items-center gap-2">
+                                    <Type className="w-5 h-5 text-sky-400" />
+                                    Tipografía
+                                </CardTitle>
+                                <CardDescription>La letra principal para tus slogans y encabezados promocionales.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6">
+                                <Select value={selectedFont} onValueChange={setSelectedFont}>
+                                    <SelectTrigger className="w-full bg-black/40 border-white/10 h-14 text-lg rounded-xl focus:ring-sky-500 transition-colors">
+                                        <SelectValue placeholder="Selecciona una fuente" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-[300px]">
+                                        <SelectItem value="Inter">Inter</SelectItem>
+                                        <SelectItem value="Roboto">Roboto</SelectItem>
+                                        <SelectItem value="Open Sans">Open Sans</SelectItem>
+                                        <SelectItem value="Lato">Lato</SelectItem>
+                                        <SelectItem value="Montserrat">Montserrat</SelectItem>
+                                        <SelectItem value="Oswald">Oswald</SelectItem>
+                                        <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
+                                        <SelectItem value="Slabo 27px">Slabo 27px</SelectItem>
+                                        <SelectItem value="PT Serif">PT Serif</SelectItem>
+                                        <SelectItem value="Merriweather">Merriweather</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Vista previa tipografía */}
+                                <div className="mt-8 p-6 bg-gradient-to-br from-white/5 to-white/0 border border-white/5 rounded-xl text-center">
+                                    <span className="text-sm text-zinc-500 block mb-2 font-medium">Vista Previa</span>
+                                    <p className="text-4xl text-white tracking-tight" style={{ fontFamily: selectedFont }}>
+                                        Ángulos ganadores.
+                                    </p>
+                                    <p className="text-zinc-400 mt-2" style={{ fontFamily: selectedFont }}>
+                                        El perro rápido salta sobre el zorro perezoso.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </div>
+
+                        <div className="p-6 border-t border-white/5 bg-black/20 flex justify-end">
+                            <Button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-semibold shadow-[0_0_20px_rgba(192,38,211,0.3)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base"
+                            >
+                                {isSaving ? (
+                                    "Guardando..."
+                                ) : (
+                                    <><Save className="w-5 h-5 mr-2" /> Confirmar Identidad</>
+                                )}
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+
+            {/* Sección Recursos IA */}
+            <div className="space-y-6 mt-2">
+                <Card className="bg-zinc-950/60 border-indigo-500/20 shadow-2xl overflow-hidden relative">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+                    <CardHeader className="border-b border-white/5 pb-4 relative z-10">
+                        <CardTitle className="text-xl text-white flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-indigo-400" />
+                            Recursos Avanzados (Entrenamiento IA)
+                        </CardTitle>
+                        <CardDescription>Sube imágenes de referencia para dominar el renderizado final aportando el estilo o los rostros exactos a usar.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+
+                        {/* Referencias de Estilo */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <ImagePlus className="w-5 h-5 text-pink-400" />
+                                <h3 className="font-semibold text-zinc-200">Referencias de Estilo</h3>
+                            </div>
+                            <p className="text-sm text-zinc-500">¿Tienes anuncios de la competencia o posts que te envuelven? Súbelos para calcar su esencia estética.</p>
+
+                            <div
+                                onClick={() => document.getElementById("style-upload")?.click()}
+                                className="border-2 border-dashed border-white/10 p-6 rounded-xl bg-black/40 hover:bg-black/60 cursor-pointer transition-colors text-center"
+                            >
+                                <UploadCloud className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
+                                <span className="text-sm text-zinc-400">Clic para subir imágenes de estilo</span>
+                                <input
+                                    id="style-upload"
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleStyleFilesChange}
+                                />
+                            </div>
+
+                            {styleReferenceFiles.length > 0 && (
+                                <div className="flex flex-wrap gap-3 mt-3">
+                                    {styleReferenceFiles.map((f, idx) => (
+                                        <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 group">
+                                            <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Fotos de Rostro */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <UserCircle className="w-5 h-5 text-sky-400" />
+                                <h3 className="font-semibold text-zinc-200">Rostro / Personaje Principal <span className="text-xs font-normal text-zinc-500">(Máx 5)</span></h3>
+                            </div>
+                            <p className="text-sm text-zinc-500">Sube fotos frontales y claras de la persona que quieres que la IA posicione como el protagonista de tus artes.</p>
+
+                            <div
+                                onClick={() => document.getElementById("face-upload")?.click()}
+                                className="border-2 border-dashed border-white/10 p-6 rounded-xl bg-black/40 hover:bg-black/60 cursor-pointer transition-colors text-center"
+                            >
+                                <UploadCloud className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
+                                <span className="text-sm text-zinc-400">Clic para subir fotos de rostro</span>
+                                <input
+                                    id="face-upload"
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleFaceFilesChange}
+                                />
+                            </div>
+
+                            {faceImageFiles.length > 0 && (
+                                <div className="flex flex-wrap gap-3 mt-3">
+                                    {faceImageFiles.map((f, idx) => (
+                                        <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 group">
+                                            <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                    </CardContent>
+                </Card>
+            </div>
 
             <LogoEditorModal
                 isOpen={isEditorOpen}
                 onClose={() => setIsEditorOpen(false)}
-                imageSrc={pendingImage}
+                imageSrc={pendingImage || ""}
                 onSave={handleSaveCrop}
                 onSkip={handleSkipCrop}
             />
-
-            {/* AI Logo Generator Modal */}
-            <AILogoGeneratorModal
-                isOpen={isAIGeneratorOpen}
-                onClose={() => setIsAIGeneratorOpen(false)}
-                onSelectLogo={handleAISelectLogo}
-            />
-
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Identidad Visual</h1>
-                <p className="text-muted-foreground mt-2">
-                    Define los activos visuales de tu marca. La IA generará creativos alineados a esta guía.
-                </p>
-            </div>
-
-            <Card className="border-white/10 bg-black/40 backdrop-blur-md shadow-2xl relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-orange-500/5 pointer-events-none" />
-                <CardHeader className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                    <div>
-                        <CardTitle>Activos de Marca</CardTitle>
-                        <CardDescription>
-                            Asegúrate de mantener consistencia visual en todos tus anuncios.
-                        </CardDescription>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-8 relative z-10">
-
-                    {/* Logo Section */}
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                <ImageIcon className="w-4 h-4 text-pink-400" /> Logo Principal
-                            </h3>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setIsAIGeneratorOpen(true)}
-                                className="bg-fuchsia-500/10 border-fuchsia-500/30 text-fuchsia-400 hover:bg-fuchsia-500/20"
-                            >
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Generar logo con IA
-                            </Button>
-                        </div>
-
-                        <div className="border-2 border-dashed border-white/20 rounded-xl bg-black/40 p-8 flex flex-col items-center justify-center relative overflow-hidden group min-h-[250px]">
-                            <input
-                                id="logo-upload"
-                                type="file"
-                                accept="image/png, image/jpeg, image/svg+xml"
-                                className="hidden"
-                                onChange={handleFileChange}
-                            />
-
-                            {logoPreview ? (
-                                <div className="flex flex-col items-center w-full relative z-10">
-                                    <div className="w-40 h-40 mb-4 bg-zinc-900/50 rounded-xl flex items-center justify-center overflow-hidden border border-white/10 p-4 shadow-lg group-hover:scale-105 transition duration-500">
-                                        <img
-                                            src={logoPreview}
-                                            alt="Logo preview"
-                                            className="w-full h-full object-contain"
-                                        />
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => document.getElementById('logo-upload')?.click()}
-                                            className="bg-black/50 hover:bg-black text-white border border-white/10"
-                                        >
-                                            <Upload className="w-4 h-4 mr-2" />
-                                            Cambiar
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            size="sm"
-                                            onClick={() => {
-                                                setPendingImage(logoPreview);
-                                                setIsEditorOpen(true);
-                                            }}
-                                            className="bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/30"
-                                        >
-                                            <Crop className="w-4 h-4 mr-2" />
-                                            Recortar
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div
-                                    className="flex flex-col justify-center items-center w-full h-full cursor-pointer absolute inset-0 z-0 hover:bg-white/5 transition"
-                                    onClick={() => document.getElementById('logo-upload')?.click()}
-                                >
-                                    <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4 group-hover:scale-110 transition shadow-lg">
-                                        <Upload className="w-8 h-8 text-zinc-300 group-hover:text-white transition" />
-                                    </div>
-                                    <p className="text-zinc-100 font-medium mb-1 group-hover:underline">Haz clic para subir tu logo</p>
-                                    <p className="text-zinc-500 text-sm">PNG, JPG o SVG (máx. 2MB). Fondo transparente recomendado.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Slogan Section */}
-                    <div className="space-y-4 pt-4 border-t border-white/10">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4 text-cyan-400" /> Slogan de la Marca (Opcional)
-                            </h3>
-                            {slogan.trim().length > 0 && (
-                                <div className="flex items-center space-x-2 animate-in fade-in">
-                                    <Switch
-                                        id="include-slogan"
-                                        checked={includeSlogan}
-                                        onCheckedChange={setIncludeSlogan}
-                                    />
-                                    <label
-                                        htmlFor="include-slogan"
-                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-zinc-300 cursor-pointer"
-                                    >
-                                        Incluir en anuncios
-                                    </label>
-                                </div>
-                            )}
-                        </div>
-                        <div className="relative">
-                            <Input
-                                placeholder="Ej. Simplificando el comercio digital. (Déjalo en blanco si no tienes)"
-                                value={slogan}
-                                onChange={(e) => {
-                                    setSlogan(e.target.value);
-                                    if (e.target.value.trim().length === 0) setIncludeSlogan(false);
-                                }}
-                                className="bg-black/40 border-white/10 text-base py-6 focus-visible:ring-cyan-500"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Typography Section */}
-                    <div className="space-y-4 pt-4 border-t border-white/10">
-                        <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                            <Type className="w-4 h-4 text-orange-400" /> Tipografía Principal
-                        </h3>
-                        <TypographySelector
-                            selectedFont={typography}
-                            onSelectFont={setTypography}
-                        />
-                    </div>
-
-                    {/* Colors Section */}
-                    <div className="space-y-4 pt-4 border-t border-white/10">
-                        <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                            <Palette className="w-4 h-4 text-fuchsia-400" /> Colores de Marca
-                        </h3>
-                        <div className="flex flex-col sm:flex-row gap-6 bg-black/40 p-6 rounded-xl border border-white/10">
-                            <div className="flex items-center gap-4 flex-1">
-                                <div className="flex flex-col flex-1">
-                                    <label className="text-sm font-medium text-zinc-200">Color Primario</label>
-                                    <span className="text-xs text-zinc-500">Predominante</span>
-                                </div>
-                                <div className="relative group cursor-pointer">
-                                    <input
-                                        type="color"
-                                        value={primaryColor}
-                                        onChange={(e) => setPrimaryColor(e.target.value)}
-                                        className="w-14 h-14 rounded-xl cursor-pointer bg-transparent border-0 p-0 absolute opacity-0 z-10 inset-0"
-                                    />
-                                    <div
-                                        className="w-14 h-14 rounded-xl border-2 border-white/20 shadow-lg group-hover:scale-105 transition-transform"
-                                        style={{ backgroundColor: primaryColor }}
-                                    />
-                                </div>
-                                <div className="px-3 py-1.5 bg-black/60 rounded-md font-mono text-sm text-zinc-300 border border-white/10 uppercase w-24 text-center">
-                                    {primaryColor}
-                                </div>
-                            </div>
-
-                            <div className="hidden sm:block w-px bg-white/10 mx-2" />
-                            <div className="sm:hidden h-px w-full bg-white/10 my-2" />
-
-                            <div className="flex items-center gap-4 flex-1">
-                                <div className="flex flex-col flex-1">
-                                    <label className="text-sm font-medium text-zinc-200">Color Secundario</label>
-                                    <span className="text-xs text-zinc-500">Acentos</span>
-                                </div>
-                                <div className="relative group cursor-pointer">
-                                    <input
-                                        type="color"
-                                        value={secondaryColor}
-                                        onChange={(e) => setSecondaryColor(e.target.value)}
-                                        className="w-14 h-14 rounded-xl cursor-pointer bg-transparent border-0 p-0 absolute opacity-0 z-10 inset-0"
-                                    />
-                                    <div
-                                        className="w-14 h-14 rounded-xl border-2 border-white/20 shadow-lg group-hover:scale-105 transition-transform"
-                                        style={{ backgroundColor: secondaryColor }}
-                                    />
-                                </div>
-                                <div className="px-3 py-1.5 bg-black/60 rounded-md font-mono text-sm text-zinc-300 border border-white/10 uppercase w-24 text-center">
-                                    {secondaryColor}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="pt-8 flex justify-end">
-                        <Button
-                            onClick={handleSave}
-                            disabled={isSaving}
-                            className="font-semibold shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all px-8 py-6 rounded-full text-base bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white border-0"
-                        >
-                            {isSaving ? (
-                                <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Guardando Identidad...</span>
-                            ) : (
-                                <span className="flex items-center gap-2">Guardar Identidad Visual <ArrowRight className="w-5 h-5 mt-0.5" /></span>
-                            )}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
         </div>
     );
 }

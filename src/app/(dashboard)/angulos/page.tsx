@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lightbulb, Zap, Plus, ArrowRight, CheckSquare, Square, Trash2 } from "lucide-react";
+import { Lightbulb, Zap, Plus, ArrowRight, CheckSquare, Square, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { createClient } from "@supabase/supabase-js";
+import { useProjectStore } from "@/lib/store";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +20,20 @@ const MOCK_ANGLES = [
 
 export default function AngulosPage() {
     const router = useRouter();
+    const { getToken } = useAuth();
+    const { user } = useUser();
+    const { activeProjectId, projects, settings } = useProjectStore();
     const [mounted, setMounted] = useState(false);
+
+    const activeProject = projects.find(p => p.id === activeProjectId);
+    const analysis = activeProject?.analysis;
 
     // Internal state for angles array
     const [angles, setAngles] = useState<{ id: string; text: string; selected: boolean }[]>([]);
 
     // UI state
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [showManualInput, setShowManualInput] = useState(false);
     const [manualAngleText, setManualAngleText] = useState("");
 
@@ -47,15 +57,50 @@ export default function AngulosPage() {
         }
     }, [angles, mounted]);
 
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
+        if (!activeProjectId || !analysis) {
+            toast.error("Falta el análisis del producto. Ve a Análisis IA primero.");
+            return;
+        }
+
         setIsGenerating(true);
-        // Simulate API call
-        setTimeout(() => {
-            const newAngles = MOCK_ANGLES.map(a => ({ ...a, selected: false, id: crypto.randomUUID() }));
-            setAngles(prev => [...prev, ...newAngles]);
+        try {
+            const res = await fetch('/api/generate-angles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId: activeProjectId,
+                    analysis: analysis,
+                    settings: settings,
+                    userId: user?.id
+                })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Error al conectar con la IA.");
+            }
+
+            const data = await res.json();
+
+            if (data.angles && Array.isArray(data.angles)) {
+                const newAngles = data.angles.map((text: string) => ({
+                    id: crypto.randomUUID(),
+                    text,
+                    selected: false
+                }));
+                // Si la IA generó 10, reemplazaremos o añadiremos. Si es el primer click usualmente se reemplaza para no sobrecargar
+                setAngles(newAngles);
+                toast.success("Ángulos generados por IA.");
+            } else {
+                throw new Error("Respuesta inválida de la IA.");
+            }
+        } catch (error: any) {
+            console.error(error);
+            toast.error(`Generación fallida: ${error.message}`);
+        } finally {
             setIsGenerating(false);
-            toast.success("Ángulos generados por IA.");
-        }, 1500);
+        }
     };
 
     const handleAddManual = () => {
@@ -76,18 +121,63 @@ export default function AngulosPage() {
         setAngles(prev => prev.filter(a => a.id !== id));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const selectedCount = angles.filter(a => a.selected).length;
         if (selectedCount === 0) {
             toast.error("Selecciona al menos un ángulo para continuar.");
             return;
         }
 
-        // Explicitly format and save to local storage again just to be certain
-        localStorage.setItem("selectedAngles", JSON.stringify(angles));
+        if (!activeProjectId || !user) {
+            toast.error("Debes tener un proyecto activo y estar autenticado.");
+            return;
+        }
 
-        toast.success(`${selectedCount} ángulos guardados correctamente.`);
-        router.push("/fabrica");
+        setIsSaving(true);
+        const toastId = toast.loading("Guardando ángulos...");
+
+        try {
+            // Guardar localmente también por si acaso
+            localStorage.setItem("selectedAngles", JSON.stringify(angles));
+
+            const token = await getToken({ template: 'supabase' });
+            if (!token) throw new Error("No se pudo obtener el token de autenticación");
+
+            const supabaseAuth = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                { global: { headers: { Authorization: `Bearer ${token}` } } }
+            );
+
+            // Primero borramos los ángulos anteriores para este proyecto para evitar duplicados en la re-generación
+            const { error: deleteError } = await supabaseAuth.from('angles').delete().eq('project_id', activeProjectId);
+
+            if (deleteError) {
+                console.error("Error al borrar ángulos previos:", deleteError);
+                throw new Error("No se pudieron borrar los ángulos anteriores. " + deleteError.message);
+            }
+
+            // Preparar el bulk insert
+            const anglesToInsert = angles.map(a => ({
+                id: a.id.length === 36 ? a.id : crypto.randomUUID(), // Valid UUID required
+                project_id: activeProjectId,
+                user_id: user.id,
+                angle_text: a.text,
+                selected: a.selected
+            }));
+
+            const { error } = await supabaseAuth.from('angles').insert(anglesToInsert);
+
+            if (error) throw error;
+
+            toast.success(`${selectedCount} ángulos guardados correctamente.`, { id: toastId });
+            router.push("/fabrica");
+        } catch (error: any) {
+            console.error("Error guardando ángulos:", error);
+            toast.error(`Error de base de datos: ${error.message}`, { id: toastId });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (!mounted) return null;
@@ -106,6 +196,11 @@ export default function AngulosPage() {
                     <p className="text-zinc-400 text-lg max-w-xl">
                         Basado en el ADN de tu producto, la IA elaborará ideas disruptivas para atacar los dolores de tu avatar.
                     </p>
+                    {analysis && analysis.product && (
+                        <div className="mt-4 p-3 bg-zinc-950/80 border border-white/5 rounded-lg text-sm text-zinc-300 max-w-xl">
+                            <strong className="text-amber-500/80">ADN Detectado:</strong> Vendiendo <span className="text-white font-medium">{analysis.product}</span> a <span className="text-white font-medium">{analysis.avatar}</span> para ayudarles a <span className="text-white font-medium">{analysis.promise}</span>.
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -166,8 +261,8 @@ export default function AngulosPage() {
                                 key={angle.id}
                                 onClick={() => toggleAngleSelection(angle.id)}
                                 className={`cursor-pointer transition-all duration-200 border-l-4 ${angle.selected
-                                        ? "bg-amber-500/10 border-amber-500 border-y-white/10 border-r-white/10"
-                                        : "bg-zinc-950 border-white/5 hover:bg-zinc-900"
+                                    ? "bg-amber-500/10 border-amber-500 border-y-white/10 border-r-white/10"
+                                    : "bg-zinc-950 border-white/5 hover:bg-zinc-900"
                                     }`}
                             >
                                 <CardContent className="p-4 flex items-center justify-between gap-4">
@@ -208,9 +303,11 @@ export default function AngulosPage() {
 
                     <Button
                         onClick={handleSave}
+                        disabled={isSaving}
                         className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base"
                     >
-                        Guardar Ángulos y Continuar <ArrowRight className="w-5 h-5 ml-2" />
+                        {isSaving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : "Guardar Ángulos y Continuar"}
+                        {!isSaving && <ArrowRight className="w-5 h-5 ml-2" />}
                     </Button>
                 </div>
             )}

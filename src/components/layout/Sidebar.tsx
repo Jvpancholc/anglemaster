@@ -11,6 +11,7 @@ import {
   BrainCircuit,
   Target,
   Factory,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +19,7 @@ const routes = [
   {
     label: "Inicio",
     icon: LayoutDashboard,
-    href: "/", // Main dashboard route
+    href: "/dashboard", // Main dashboard route
     color: "text-sky-500",
   },
   {
@@ -63,6 +64,12 @@ const routes = [
     href: "/fabrica",
     color: "text-yellow-500",
   },
+  {
+    label: "Preferencias",
+    icon: Settings,
+    href: "/preferencias",
+    color: "text-zinc-400",
+  },
 ];
 
 export const Sidebar = () => {
@@ -71,7 +78,7 @@ export const Sidebar = () => {
   return (
     <div className="space-y-4 py-4 flex flex-col h-full bg-transparent text-foreground">
       <div className="px-3 py-2 flex-1 relative z-10">
-        <Link href="/" className="flex items-center pl-3 mb-14 transition-opacity hover:opacity-80">
+        <Link href="/dashboard" className="flex items-center pl-3 mb-14 transition-opacity hover:opacity-80">
           <div className="relative w-8 h-8 mr-4">
             <div className="absolute -inset-1 bg-gradient-to-r from-primary to-fuchsia-600 rounded-lg blur opacity-50"></div>
             <div className="relative w-8 h-8 bg-gradient-to-tr from-violet-600 to-fuchsia-600 rounded-lg flex items-center justify-center font-bold text-xl text-white shadow-xl shadow-primary/20">

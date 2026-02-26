@@ -10,6 +10,7 @@ export interface Project {
         niche: string;
         cta: string;
         description: string;
+        productPhotos?: string[];
     };
     identity: {
         primaryColor: string;
@@ -21,6 +22,8 @@ export interface Project {
         logoVariations?: { full?: string; icon?: string; text?: string };
         logoGenerated?: boolean;
         brandDescription?: string;
+        styleReferences?: string[];
+        faceImages?: string[];
     };
     creativeFormats: string[];
     visualStyle: string | null;
@@ -36,13 +39,24 @@ export interface Project {
     updatedAt: string;
 }
 
+export interface ProjectSettings {
+    openAiKey?: string | null;
+    replicateKey?: string | null;
+    geminiKey?: string | null;
+    aiProvider?: string;
+    language?: string;
+}
+
 interface ProjectState {
     projects: Project[];
     activeProjectId: string | null;
+    settings: ProjectSettings;
     setActiveProject: (id: string) => void;
     clearActiveProject: () => void;
-    createProject: (baseName?: string) => string;
+    createProject: (baseName?: string, presetId?: string) => string;
     updateProject: (id: string, data: Partial<Project>) => void;
+    deleteProject: (id: string) => void;
+    updateSettings: (settings: Partial<ProjectSettings>) => void;
 }
 
 const emptyProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'name'> = {
@@ -52,16 +66,19 @@ const emptyProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'name'> = {
         niche: '',
         cta: '',
         description: '',
+        productPhotos: [],
     },
     identity: {
         primaryColor: '#6366f1',
         secondaryColor: '#a855f7',
-        typography: 'Inter',
+        typography: 'auto',
         slogan: '',
         includeSlogan: false,
         logoVariations: {},
         logoGenerated: false,
         brandDescription: '',
+        styleReferences: [],
+        faceImages: [],
     },
     creativeFormats: [],
     visualStyle: null,
@@ -75,15 +92,24 @@ const emptyProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'name'> = {
     angles: [],
 };
 
+const defaultSettings: ProjectSettings = {
+    openAiKey: '',
+    replicateKey: '',
+    geminiKey: '',
+    aiProvider: 'openai',
+    language: 'Español'
+};
+
 export const useProjectStore = create<ProjectState>()(
     persist(
         (set) => ({
             projects: [],
             activeProjectId: null,
+            settings: defaultSettings,
             setActiveProject: (id) => set({ activeProjectId: id }),
             clearActiveProject: () => set({ activeProjectId: null }),
-            createProject: (baseName) => {
-                const id = crypto.randomUUID();
+            createProject: (baseName, presetId) => {
+                const id = presetId || crypto.randomUUID();
                 const newProject: Project = {
                     id,
                     name: baseName || 'Mi Nuevo Proyecto',
@@ -106,10 +132,21 @@ export const useProjectStore = create<ProjectState>()(
                     p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p
                 )
             })),
+            deleteProject: (id) => set((state) => ({
+                projects: state.projects.filter(p => p.id !== id),
+                activeProjectId: state.activeProjectId === id ? null : state.activeProjectId
+            })),
+            updateSettings: (newSettings) => set((state) => ({
+                settings: { ...state.settings, ...newSettings }
+            })),
         }),
         {
             name: 'anglemaster-state',
-            partialize: (state) => ({ projects: state.projects, activeProjectId: state.activeProjectId }),
+            partialize: (state) => ({
+                projects: state.projects,
+                activeProjectId: state.activeProjectId,
+                settings: state.settings,
+            }),
         }
     )
 );

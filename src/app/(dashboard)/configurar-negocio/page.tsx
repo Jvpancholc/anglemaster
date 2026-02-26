@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Store, Link as LinkIcon, Target, AlignLeft, MousePointerClick, Plus, Upload, ArrowRight } from "lucide-react";
+import { Store, Link as LinkIcon, Target, AlignLeft, MousePointerClick, Plus, Upload, ArrowRight, Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
@@ -21,6 +21,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { createClient } from "@supabase/supabase-js";
+import { useAuth, useUser } from "@clerk/nextjs";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabase = createClient(supabaseUrl || "https://mock.supabase.co", supabaseAnonKey || "mock-key");
 
 const formSchema = z.object({
     businessName: z.string().min(2, { message: "Mínimo 2 caracteres." }),
@@ -28,14 +34,18 @@ const formSchema = z.object({
     niche: z.string().min(2, { message: "Requerido." }),
     productDescription: z.string().min(10, { message: "Mínimo 10 caracteres." }),
     mainCta: z.string().optional(),
-    primaryColor: z.string(),
-    secondaryColor: z.string(),
 });
 
 export default function ConfigurarNegocioPage() {
     const router = useRouter();
+    const { getToken } = useAuth();
+    const { user } = useUser();
     const { activeProjectId, projects, updateProject } = useProjectStore();
     const [mounted, setMounted] = useState(false);
+
+    const [productPhotos, setProductPhotos] = useState<string[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -45,8 +55,6 @@ export default function ConfigurarNegocioPage() {
             niche: "",
             productDescription: "",
             mainCta: "",
-            primaryColor: "#6366f1",
-            secondaryColor: "#a855f7",
         },
     });
 
@@ -65,35 +73,205 @@ export default function ConfigurarNegocioPage() {
                 niche: project.config.niche || "",
                 productDescription: project.config.description || "",
                 mainCta: project.config.cta || "",
-                primaryColor: project.identity.primaryColor || "#6366f1",
-                secondaryColor: project.identity.secondaryColor || "#a855f7",
             });
+            setProductPhotos(project.config.productPhotos || []);
         }
     }, [activeProjectId, projects, form, router]);
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        if (!activeProjectId) return;
+    const handlePhotoUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !activeProjectId) return;
 
-        updateProject(activeProjectId, {
-            name: values.businessName, // keep the project item title synched
-            config: {
-                businessName: values.businessName,
-                shopifyUrl: values.shopifyUrl,
-                niche: values.niche,
-                cta: values.mainCta || "",
-                description: values.productDescription,
-            },
-            identity: {
-                // retrieve existing and merge
-                ...projects.find(p => p.id === activeProjectId)?.identity,
-                primaryColor: values.primaryColor,
-                secondaryColor: values.secondaryColor,
-                typography: 'Inter' // default
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("El archivo excede el tamaño máximo permitido (5MB).");
+            return;
+        }
+
+        setIsUploading(true);
+        const toastId = toast.loading("Subiendo foto...");
+
+        try {
+            if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
+                const token = await getToken({ template: 'supabase' });
+
+                if (!token) {
+                    toast.error("Error de autenticación: No se ha podido validar tu sesión con Clerk.", { id: toastId });
+                    setIsUploading(false);
+                    return;
+                }
+
+                const supabaseAuth = createClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    {
+                        global: { headers: { Authorization: `Bearer ${token}` } }
+                    }
+                );
+
+                // Ensure bucket exists before upload (silently catch if error)
+                try {
+                    await fetch('/api/init-bucket', { method: 'POST' });
+                } catch (e) { }
+
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${activeProjectId}/${Date.now()}_photo_${index}.${fileExt}`;
+
+                const { error } = await supabaseAuth.storage
+                    .from('product-images')
+                    .upload(fileName, file, { upsert: true, contentType: file.type });
+
+                if (error) {
+                    throw error;
+                }
+
+                const { data: publicUrlData } = supabaseAuth.storage
+                    .from('product-images')
+                    .getPublicUrl(fileName);
+
+                const newUrl = publicUrlData.publicUrl;
+
+                setProductPhotos(prev => {
+                    const newPhotos = [...prev];
+                    newPhotos[index] = newUrl;
+                    return newPhotos;
+                });
+                toast.success("Foto subida correctamente", { id: toastId });
+            } else {
+                // Mock local URL for demo
+                const newUrl = URL.createObjectURL(file);
+                setProductPhotos(prev => {
+                    const newPhotos = [...prev];
+                    newPhotos[index] = newUrl;
+                    return newPhotos;
+                });
+                toast.success("Foto mockeada localmente", { id: toastId });
             }
-        });
+        } catch (error: any) {
+            console.error(error);
+            toast.error(`Error al subir imagen: ${error.message}`, { id: toastId });
+        } finally {
+            setIsUploading(false);
+            e.target.value = ""; // reset input
+        }
+    };
 
-        toast.success("Información guardada exitosamente");
-        router.push("/identidad-visual");
+    const handleRemovePhoto = (index: number) => {
+        setProductPhotos(prev => {
+            const newPhotos = [...prev];
+            delete newPhotos[index]; // remove but preserve indices
+            return newPhotos;
+        });
+    }
+
+    const renderPhotoSlot = (index: number, label: string) => {
+        const photoUrl = productPhotos[index];
+        return (
+            <div key={index} className="relative border border-dashed border-white/20 rounded-xl bg-white/5 flex flex-col items-center justify-center min-h-[140px] aspect-square overflow-hidden hover:bg-white/10 transition group">
+                {photoUrl ? (
+                    <>
+                        <img src={photoUrl} alt={label} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={(e) => { e.preventDefault(); handleRemovePhoto(index); }}
+                                className="h-8 rounded-full px-3"
+                            >
+                                <X className="w-4 h-4 mr-1" /> Quitar
+                            </Button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <input
+                            type="file"
+                            accept="image/png, image/jpeg, image/webp"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            onChange={(e) => handlePhotoUpload(index, e)}
+                            disabled={isUploading}
+                        />
+                        {index === 0 ? <Upload className="w-6 h-6 text-zinc-400 mb-2 group-hover:scale-110 transition-transform" /> : <Plus className="w-6 h-6 text-zinc-400 mb-2 group-hover:scale-110 transition-transform" />}
+                        <span className="text-sm font-medium text-zinc-300">{label}</span>
+                        <span className="text-xs text-zinc-500">{index === 0 ? "Subir" : "Añadir"}</span>
+                    </>
+                )}
+            </div>
+        );
+    };
+
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        if (!activeProjectId) return;
+        setIsSaving(true);
+
+        try {
+            updateProject(activeProjectId, {
+                name: values.businessName, // keep the project item title synched
+                config: {
+                    businessName: values.businessName,
+                    shopifyUrl: values.shopifyUrl,
+                    niche: values.niche,
+                    cta: values.mainCta || "",
+                    description: values.productDescription,
+                    productPhotos: productPhotos,
+                },
+                identity: {
+                    primaryColor: '#6366f1',
+                    secondaryColor: '#a855f7',
+                    // retrieve existing and merge
+                    ...projects.find(p => p.id === activeProjectId)?.identity,
+                    typography: projects.find(p => p.id === activeProjectId)?.identity?.typography || 'Inter'
+                }
+            });
+
+            if (supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://mock.supabase.co") {
+                const token = await getToken({ template: 'supabase' });
+
+                if (!token) {
+                    toast.error("Error de autenticación: No se ha podido validar tu sesión.");
+                    setIsSaving(false);
+                    return;
+                }
+
+                const supabaseAuth = createClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    {
+                        global: { headers: { Authorization: `Bearer ${token}` } }
+                    }
+                );
+
+                // Limpiar undefined/nulls en array para evitar errores JSON
+                const cleanPhotos = productPhotos.filter(Boolean);
+
+                const { error: dbError } = await supabaseAuth
+                    .from('business_config')
+                    .upsert({
+                        project_id: activeProjectId,
+                        user_id: user?.id,
+                        business_name: values.businessName,
+                        shopify_url: values.shopifyUrl,
+                        niche: values.niche,
+                        description: values.productDescription,
+                        cta: values.mainCta || "",
+                        product_photos: cleanPhotos
+                    }, { onConflict: 'project_id' });
+
+                if (dbError) {
+                    console.error("No se pudo insertar en la tabla business_config:", dbError);
+                    toast.error(`Error guardando en base de datos: ${dbError.message}`);
+                    setIsSaving(false);
+                    return; // Stop execution to prevent success message
+                }
+            }
+
+            toast.success("Información guardada exitosamente");
+            router.push("/identidad-visual");
+        } catch (error) {
+            console.error("Error saving config:", error);
+            toast.error("Hubo un error al guardar la configuración.");
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     if (!mounted) return null;
@@ -202,74 +380,34 @@ export default function ConfigurarNegocioPage() {
                                 )}
                             />
 
-                            {/* Secciones Adicionales Solicitadas */}
-                            <div className="pt-6 border-t border-white/10">
-                                <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-zinc-200">
-                                    <span className="text-pink-500">🎨</span> Paleta de Colores
-                                </h3>
-                                <div className="flex gap-6">
-                                    <FormField
-                                        control={form.control}
-                                        name="primaryColor"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-center gap-4 space-y-0">
-                                                <div className="flex flex-col">
-                                                    <FormLabel>Color Primario</FormLabel>
-                                                    <FormDescription className="text-xs">Predominante</FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <input type="color" className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-0 p-0" {...field} />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="secondaryColor"
-                                        render={({ field }) => (
-                                            <FormItem className="flex items-center gap-4 space-y-0">
-                                                <div className="flex flex-col">
-                                                    <FormLabel>Color Secundario</FormLabel>
-                                                    <FormDescription className="text-xs">Acentos</FormDescription>
-                                                </div>
-                                                <FormControl>
-                                                    <input type="color" className="w-12 h-12 rounded-lg cursor-pointer bg-transparent border-0 p-0" {...field} />
-                                                </FormControl>
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-                            </div>
+                            {/* Identidad Visual Color Selection removed as requested */}
 
                             <div className="pt-6 border-t border-white/10">
                                 <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-zinc-200">
                                     <span className="text-blue-500">📸</span> Fotos de Producto
                                 </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div className="border border-dashed border-white/20 rounded-xl bg-white/5 p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover:bg-white/10 transition">
-                                        <Upload className="w-6 h-6 text-zinc-400 mb-2" />
-                                        <span className="text-sm font-medium text-zinc-300">Principal</span>
-                                        <span className="text-xs text-zinc-500">Subir</span>
-                                    </div>
-                                    <div className="border border-dashed border-white/20 rounded-xl bg-white/5 p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover:bg-white/10 transition">
-                                        <Plus className="w-6 h-6 text-zinc-400 mb-2" />
-                                        <span className="text-sm font-medium text-zinc-300">Detalle</span>
-                                        <span className="text-xs text-zinc-500">Añadir</span>
-                                    </div>
-                                    <div className="border border-dashed border-white/20 rounded-xl bg-white/5 p-4 flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover:bg-white/10 transition">
-                                        <Plus className="w-6 h-6 text-zinc-400 mb-2" />
-                                        <span className="text-sm font-medium text-zinc-300">Detalle</span>
-                                        <span className="text-xs text-zinc-500">Añadir</span>
-                                    </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    {renderPhotoSlot(0, "Principal")}
+                                    {renderPhotoSlot(1, "Detalle 1")}
+                                    {renderPhotoSlot(2, "Detalle 2")}
+                                    {renderPhotoSlot(3, "Detalle 3")}
                                 </div>
                                 <p className="text-xs text-zinc-500 mt-3">
-                                    Sube la foto principal aquí. La IA la usará como referencia.
+                                    Sube la foto principal aquí. La IA la usará como referencia. (Máx 5MB)
                                 </p>
                             </div>
 
                             <div className="flex justify-end pt-4">
-                                <Button type="submit" className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-500 hover:to-pink-500 text-white font-semibold shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all px-8 py-5 rounded-full">
-                                    Guardar Marca y Continuar <ArrowRight className="w-4 h-4 mt-0.5 ml-2" />
+                                <Button
+                                    type="submit"
+                                    disabled={isSaving || isUploading}
+                                    className="bg-gradient-to-r from-orange-600 to-pink-600 hover:from-orange-500 hover:to-pink-500 text-white font-semibold shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all px-8 py-6 rounded-full text-base border-0"
+                                >
+                                    {isSaving ? (
+                                        <span className="flex items-center gap-2"><Loader2 className="w-5 h-5 animate-spin" /> Guardando...</span>
+                                    ) : (
+                                        <span className="flex items-center gap-2">Guardar Marca y Continuar <ArrowRight className="w-5 h-5 mt-0.5" /></span>
+                                    )}
                                 </Button>
                             </div>
                         </form>

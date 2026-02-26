@@ -23,6 +23,7 @@ export async function POST(req: Request) {
         }
 
         const hasLogosBucket = buckets.some(b => b.name === 'logos');
+        const hasProductPhotosBucket = buckets.some(b => b.name === 'product-photos');
 
         if (!hasLogosBucket) {
             console.log("Bucket 'logos' not found, attempting to create...");
@@ -34,15 +35,33 @@ export async function POST(req: Request) {
 
             if (createError) {
                 console.error("Create bucket error:", createError);
-                return NextResponse.json({ error: createError.message }, { status: 500 });
+            } else {
+                console.log("Bucket 'logos' created successfully!");
             }
-            console.log("Bucket 'logos' created successfully!");
         } else {
-            // Double check it's public (Admin API doesn't let us easily toggle this without updating bucket, but if it exists we assume it's right or we could run updateBucket)
+            // Double check it's public
             await supabase.storage.updateBucket('logos', { public: true });
         }
 
-        return NextResponse.json({ success: true, message: "Bucket 'logos' initialized" });
+        if (!hasProductPhotosBucket) {
+            console.log("Bucket 'product-photos' not found, attempting to create...");
+            const { error: createError } = await supabase.storage.createBucket('product-photos', {
+                public: true,
+                fileSizeLimit: 5242880, // 5MB
+                allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp']
+            });
+
+            if (createError) {
+                console.error("Create product-photos bucket error:", createError);
+            } else {
+                console.log("Bucket 'product-photos' created successfully!");
+            }
+        } else {
+            // Double check it's public
+            await supabase.storage.updateBucket('product-photos', { public: true });
+        }
+
+        return NextResponse.json({ success: true, message: "Buckets initialized" });
 
     } catch (error: any) {
         console.error("Init Bucket Error:", error);
