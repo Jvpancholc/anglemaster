@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { GOOGLE_FONTS } from "@/lib/fonts";
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req: Request) {
     try {
+        const openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY || "dummy", // Prevents crashing if env is missing
+        });
+
         const body = await req.json();
         const { businessName, niche, description } = body;
 
