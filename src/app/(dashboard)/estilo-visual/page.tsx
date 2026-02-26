@@ -6,7 +6,7 @@ import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Image as ImageIcon, PenTool, Box, PlaySquare, Layout, Sparkles, ImagePlus, UploadCloud, User } from "lucide-react";
+import { Check, Image as ImageIcon, PenTool, Box, PlaySquare, Layout, Sparkles, ImagePlus, UploadCloud, User, Target, Save, Eye } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -168,21 +168,23 @@ export default function EstiloVisualPage() {
     if (!mounted) return null;
 
     return (
-        <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-            <div className="text-center sm:text-left flex flex-col items-center sm:items-start">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-xs text-fuchsia-400 font-medium mb-4">
-                    <PenTool className="w-3 h-3" />
-                    Estética Fundamental
+        <div className="flex flex-col gap-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+            <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-end">
+                <div className="text-center sm:text-left flex flex-col items-center sm:items-start text-white">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400 font-medium mb-4">
+                        <Eye className="w-3.5 h-3.5" />
+                        Fase 2: Espionaje Visual
+                    </div>
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4 text-white">
+                        Espionaje <span className="text-indigo-400">Visual</span>
+                    </h1>
+                    <p className="text-zinc-400 text-sm sm:text-base max-w-xl leading-relaxed">
+                        Sube contenido que la IA debe analizar. Entre mejor la referencia, mejor el resultado final. Combina un estilo base con tus imágenes de competencia y rostros.
+                    </p>
                 </div>
-                <h1 className="text-4xl font-bold tracking-tight mb-2">
-                    Estilo <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-500 to-pink-500">Visual</span>
-                </h1>
-                <p className="text-zinc-400 text-lg max-w-2xl">
-                    Define la técnica artística base. Selecciona una opción para guiar al modelo.
-                </p>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {STYLE_OPTIONS.map((style) => {
                     const isSelected = selectedStyle === style.id;
                     const Icon = style.icon;
@@ -191,33 +193,33 @@ export default function EstiloVisualPage() {
                         <Card
                             key={style.id}
                             onClick={() => setSelectedStyle(style.id)}
-                            className={`relative overflow-hidden group cursor-pointer transition-all duration-300 min-h-[220px] flex flex-col
+                            className={`relative overflow-hidden group cursor-pointer transition-all duration-300 min-h-[160px] flex flex-col border
                                 ${isSelected
-                                    ? "bg-fuchsia-500/5 border-fuchsia-500 shadow-[0_0_30px_rgba(217,70,239,0.15)] ring-1 ring-fuchsia-500/30 scale-[1.02]"
-                                    : "bg-zinc-950/60 border-white/5 hover:bg-zinc-900/80 hover:border-white/20"
+                                    ? "bg-indigo-500/10 border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/30"
+                                    : "bg-[#0e0e12] border-white/5 hover:bg-[#111116] hover:border-white/10"
                                 }
                             `}
                         >
                             {isSelected && (
                                 <div className="absolute top-3 right-3 z-20">
-                                    <div className="w-5 h-5 bg-fuchsia-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <div className="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg">
                                         <Check className="w-3 h-3 text-white" />
                                     </div>
                                 </div>
                             )}
 
-                            <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full gap-4 relative z-10">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors duration-300
-                                    ${isSelected ? "bg-fuchsia-500/20 text-fuchsia-400" : "bg-white/5 text-zinc-500 group-hover:bg-white/10 group-hover:text-zinc-300"}
+                            <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full gap-3 relative z-10 w-full">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300
+                                    ${isSelected ? "bg-indigo-500/20 text-indigo-400" : "bg-white/5 text-zinc-500 group-hover:bg-white/10 group-hover:text-zinc-300"}
                                 `}>
-                                    <Icon className="w-6 h-6" />
+                                    <Icon className="w-5 h-5" />
                                 </div>
 
-                                <div>
-                                    <h3 className={`font-bold mb-1 ${isSelected ? "text-fuchsia-100" : "text-zinc-200"}`}>
+                                <div className="w-full">
+                                    <h3 className={`font-bold mb-1 text-sm ${isSelected ? "text-indigo-100" : "text-zinc-200"}`}>
                                         {style.title}
                                     </h3>
-                                    <p className="text-xs text-zinc-500 leading-relaxed">
+                                    <p className="text-[10px] text-zinc-500 leading-tight">
                                         {style.desc}
                                     </p>
                                 </div>
@@ -227,102 +229,114 @@ export default function EstiloVisualPage() {
                 })}
             </div>
 
-            {/* Sección Recursos IA */}
-            <div className="space-y-6 mt-2">
-                <Card className="bg-zinc-950/60 border-indigo-500/20 shadow-2xl overflow-hidden relative">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
-                    <CardHeader className="border-b border-white/5 pb-4 relative z-10">
-                        <CardTitle className="text-xl text-white flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-indigo-400" />
-                            Recursos Avanzados (Entrenamiento IA)
-                        </CardTitle>
-                        <CardDescription>Sube imágenes de referencia para dominar el renderizado final aportando el estilo o los rostros exactos a usar.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+            {/* Espionaje AI Uploads */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
 
-                        {/* Referencias de Estilo */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <ImagePlus className="w-5 h-5 text-pink-400" />
-                                <h3 className="font-semibold text-zinc-200">Referencias de Estilo <span className="text-xs text-zinc-500 font-normal">(Máx 2)</span></h3>
-                            </div>
-                            <p className="text-sm text-zinc-500">¿Tienes anuncios de la competencia o posts que te envuelven? Súbelos para calcar su esencia estética.</p>
+                {/* Competence References */}
+                <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden group hover:border-white/10 transition-colors">
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl pointer-events-none" />
 
-                            <div
-                                onClick={() => document.getElementById("style-upload")?.click()}
-                                className="border-2 border-dashed border-white/10 p-6 rounded-xl bg-black/40 hover:bg-black/60 cursor-pointer transition-colors text-center"
-                            >
-                                <UploadCloud className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-                                <span className="text-sm text-zinc-400">Clic para subir imágenes de estilo</span>
-                                <input
-                                    id="style-upload"
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleStyleFilesChange}
-                                />
-                            </div>
-
-                            {styleReferenceFiles.length > 0 && (
-                                <div className="flex flex-wrap gap-3 mt-3">
-                                    {styleReferenceFiles.map((f, idx) => (
-                                        <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 group">
-                                            <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <ImagePlus className="w-5 h-5 text-pink-400" />
+                            <h3 className="font-bold text-white text-lg">Referencias de Competencia</h3>
                         </div>
+                        <p className="text-xs text-zinc-500">
+                            Sube anuncios, posts o artes visuales de tu competencia o inspiración. La IA calcará su composición visual.
+                        </p>
+                    </div>
 
-                        {/* Rostros y Personajes */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <User className="w-5 h-5 text-sky-400" />
-                                <h3 className="font-semibold text-zinc-200">Rostro / Personaje Principal <span className="text-xs text-zinc-500 font-normal">(Máx 4, Recomendado: 1)</span></h3>
-                            </div>
-                            <p className="text-sm text-zinc-500">Sube fotos frontales y claras de la persona que quieres que la IA posicione como el protagonista de tus artes.</p>
+                    <div
+                        onClick={() => document.getElementById("style-upload")?.click()}
+                        className="mt-2 border-2 border-dashed border-white/10 p-8 rounded-xl bg-black/20 hover:bg-white/5 cursor-pointer transition-colors text-center flex flex-col items-center justify-center"
+                    >
+                        <UploadCloud className="w-8 h-8 text-zinc-600 mb-3" />
+                        <span className="text-sm font-medium text-zinc-400">Click para subir (Máx 2)</span>
+                        <input
+                            id="style-upload"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleStyleFilesChange}
+                        />
+                    </div>
 
-                            <div
-                                onClick={() => document.getElementById("face-upload")?.click()}
-                                className="border-2 border-dashed border-white/10 p-6 rounded-xl bg-black/40 hover:bg-black/60 cursor-pointer transition-colors text-center"
-                            >
-                                <UploadCloud className="w-8 h-8 text-zinc-500 mx-auto mb-2" />
-                                <span className="text-sm text-zinc-400">Clic para subir fotos de rostro</span>
-                                <input
-                                    id="face-upload"
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={handleFaceFilesChange}
-                                />
-                            </div>
-
-                            {faceImageFiles.length > 0 && (
-                                <div className="flex flex-wrap gap-3 mt-3">
-                                    {faceImageFiles.map((f, idx) => (
-                                        <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 group">
-                                            <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
-                                        </div>
-                                    ))}
+                    {styleReferenceFiles.length > 0 && (
+                        <div className="flex flex-wrap gap-3 mt-2">
+                            {styleReferenceFiles.map((f, idx) => (
+                                <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group/img">
+                                    <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                                    <button onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStyleReferenceFiles(prev => prev.filter((_, i) => i !== idx));
+                                    }} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
+                                        Quitar
+                                    </button>
                                 </div>
-                            )}
+                            ))}
                         </div>
-                    </CardContent>
-                </Card>
+                    )}
+                </div>
+
+                {/* Faces References */}
+                <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden group hover:border-white/10 transition-colors">
+                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <User className="w-5 h-5 text-sky-400" />
+                            <h3 className="font-bold text-white text-lg">Fotos de Rostro <span className="text-zinc-500 font-normal text-sm">(Opcional)</span></h3>
+                        </div>
+                        <p className="text-xs text-zinc-500">
+                            ¿Quieres que la IA use tu rostro o el de tu cliente? Sube 1 a 4 fotos claras, mirando al frente, con buena iluminación.
+                        </p>
+                    </div>
+
+                    <div
+                        onClick={() => document.getElementById("face-upload")?.click()}
+                        className="mt-2 border-2 border-dashed border-white/10 p-8 rounded-xl bg-black/20 hover:bg-white/5 cursor-pointer transition-colors text-center flex flex-col items-center justify-center"
+                    >
+                        <UploadCloud className="w-8 h-8 text-zinc-600 mb-3" />
+                        <span className="text-sm font-medium text-zinc-400">Click para subir (Máx 4)</span>
+                        <input
+                            id="face-upload"
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleFaceFilesChange}
+                        />
+                    </div>
+
+                    {faceImageFiles.length > 0 && (
+                        <div className="flex flex-wrap gap-3 mt-2">
+                            {faceImageFiles.map((f, idx) => (
+                                <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10 group/img">
+                                    <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                                    <button onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFaceImageFiles(prev => prev.filter((_, i) => i !== idx));
+                                    }} className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-medium">
+                                        Quitar
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-6 mt-8">
-                <p className="text-sm text-zinc-400 flex items-center gap-2">
-                    <span className="text-fuchsia-500 text-lg">🎨</span> El estilo seleccionado se combinará con los <strong className="text-emerald-400">Formatos Creativos</strong>.
-                </p>
+            <div className="sticky bottom-6 mt-4 p-4 rounded-2xl bg-[#111116] border border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-2xl z-10 w-full">
+                <div className="text-sm text-zinc-400 flex items-center gap-2 px-2">
+                    <Sparkles className="w-4 h-4 text-indigo-400" /> Completa tu entrenamiento IA para mejores resultados.
+                </div>
                 <Button
                     onClick={handleSave}
                     disabled={!selectedStyle || isSaving}
-                    className="bg-gradient-to-r from-fuchsia-600 to-pink-600 hover:from-fuchsia-500 hover:to-pink-500 text-white font-semibold shadow-[0_0_20px_rgba(217,70,239,0.3)] hover:shadow-[0_0_25px_rgba(217,70,239,0.5)] transition-all px-8 py-6 rounded-full w-full sm:w-auto text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all px-8 h-12 rounded-xl w-full sm:w-auto shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
-                    {isSaving ? "Guardando y Subiendo..." : <>Siguiente: Análisis IA <span className="ml-2 font-serif text-xl leading-none">→</span></>}
+                    {isSaving ? "Guardando y Subiendo..." : "Guardar Referencias y Continuar"}
                 </Button>
             </div>
         </div>

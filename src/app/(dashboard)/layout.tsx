@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { AppSync } from "@/components/layout/AppSync";
+import { GlobalStepper } from "@/components/global-stepper";
 
 const DashboardLayout = ({
     children
@@ -15,6 +16,7 @@ const DashboardLayout = ({
             <main className="md:pl-72 h-full flex flex-col">
                 <AppSync />
                 <Topbar />
+                <GlobalStepper />
                 <div className="p-8 flex-1">
                     {children}
                 </div>

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { GOOGLE_FONTS } from "@/lib/fonts";
-import OpenAI from "openai";
+import { executeWithRotation } from "@/lib/provider-rotator";
+import { auth } from "@clerk/nextjs/server";
 
 export async function POST(req: Request) {
     try {
-        const openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY || "dummy", // Prevents crashing if env is missing
-        });
+        const { userId } = await auth();
+        if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await req.json();
         const { businessName, niche, description } = body;
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
         const availableFontsList = GOOGLE_FONTS.map(f => f.name).join(", ");
 
-        const prompt = `Actúa como un director de arte experto en branding y diseño visual.
+        const systemPrompt = `Actúa como un director de arte experto en branding y diseño visual.
 Necesito que elijas la MEJOR tipografía (una sola) de esta lista exacta disponible, basándote en el ADN de esta marca:
 Lista de tipografías permitidas: ${availableFontsList}
 
@@ -29,14 +29,14 @@ Reglas:
 1. Debes elegir UNA SOLA PALA del catálogo permitido. Ni una más, ni inventadas.
 2. Tu respuesta DEBE SER EXCLUSIVAMENTE el nombre exacto de la tipografía elegida (ej. "Inter" o "Playfair Display"). No incluyas puntuación ni explicaciones adicionales, sólo el nombre de la tipografía.`;
 
-        const completion = await openai.chat.completions.create({
-            messages: [{ role: "user", content: prompt }],
-            model: "gpt-4o",
-            temperature: 0.7,
-            max_tokens: 15, // We just need the font name
+        const rotatedResults = await executeWithRotation({
+            userId,
+            taskType: "text",
+            systemPrompt,
+            userPrompt: "Dame la tipografía sugerida basándote en el contexto dado."
         });
 
-        const suggestedFont = completion.choices[0].message.content?.trim() || "Inter"; // Fallback to Inter
+        const suggestedFont = rotatedResults[0].text?.trim() || "Inter"; // Fallback to Inter
 
         // Validate that the suggestion is actually in our list, otherwise fallback
         const isValid = GOOGLE_FONTS.some(f => f.name.toLowerCase() === suggestedFont.toLowerCase());

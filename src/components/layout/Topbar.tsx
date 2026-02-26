@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, ChevronLeft } from "lucide-react";
+import { Menu, ChevronLeft, Globe } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useProjectStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,26 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from 
 import { Sidebar } from "./Sidebar";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { UserButton } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export const Topbar = () => {
     const router = useRouter();
     const pathname = usePathname();
     const { activeProjectId } = useProjectStore();
     const isDashboard = pathname === "/dashboard";
+    const [uiLang, setUiLang] = useState("ES");
+
+    useEffect(() => {
+        const savedLang = localStorage.getItem("global_ui_lang");
+        if (savedLang) setUiLang(savedLang);
+    }, []);
+
+    const handleLangChange = (lang: string) => {
+        setUiLang(lang);
+        localStorage.setItem("global_ui_lang", lang);
+        // Aquí entraría la lógica real de next-intl router.push(pathname, { locale: lang })
+    };
 
     return (
         <div className="flex items-center p-4 bg-zinc-950/60 backdrop-blur-xl border-b border-border/40 sticky top-0 z-50 justify-between">
@@ -53,6 +67,27 @@ export const Topbar = () => {
                         <span className="opacity-70 mr-1">Proyecto:</span> {activeProjectId.slice(0, 8)}...
                     </div>
                 )}
+
+                {/* Language Selector */}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-white rounded-full">
+                            <Globe className="w-4 h-4" />
+                            <span className="sr-only">Cambiar Idioma</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-zinc-950 border-white/10">
+                        <DropdownMenuItem onClick={() => handleLangChange("ES")} className="cursor-pointer flex items-center gap-2">
+                            <span>🇪🇸</span> Español {uiLang === "ES" && "✓"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleLangChange("EN")} className="cursor-pointer flex items-center gap-2">
+                            <span>🇺🇸</span> Inglés {uiLang === "EN" && "✓"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleLangChange("PT")} className="cursor-pointer flex items-center gap-2">
+                            <span>🇧🇷</span> Portugués {uiLang === "PT" && "✓"}
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
 
                 {/* Avatar and Account Management via Clerk */}
                 <UserButton afterSignOutUrl="/" />

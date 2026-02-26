@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Factory, Wand2, Download, Image as ImageIcon, AlertTriangle, ArrowLeft, Loader2, Gauge } from "lucide-react";
+import { Factory, Wand2, Download, Image as ImageIcon, AlertTriangle, ArrowLeft, Loader2, Gauge, Trash2 } from "lucide-react";
 import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
 import { useAuth, useUser } from "@clerk/nextjs";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from "next/link";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { ApiKeyModal } from "@/components/ui/ApiKeyModal";
 
 const FALLBACK_CONTEXT = {
     visualStyle: "3D Render",
@@ -42,12 +43,15 @@ export default function FabricaCreativaPage() {
     const [variantCount, setVariantCount] = useState<string>("4");
     const [generationStyle, setGenerationStyle] = useState<string>("brand");
     const [generationModel, setGenerationModel] = useState<string>("sdxl");
+    const [generationFormat, setGenerationFormat] = useState<string>("4:5");
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
     const [generatedImages, setGeneratedImages] = useState<string[]>([]);
     const [projectContext, setProjectContext] = useState<any>(null);
-    const [generationsLeft, setGenerationsLeft] = useState<number | 'Ilimitado'>(40);
+    const [savedCreatives, setSavedCreatives] = useState<any[]>([]);
+    const [generationsLeft, setGenerationsLeft] = useState<number | 'Ilimitado'>(0);
+    const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
 
     const fetchAngles = async () => {
         setIsFetching(true);
@@ -85,12 +89,16 @@ export default function FabricaCreativaPage() {
                 .eq('user_id', userId)
                 .single();
 
-            if (settings?.replicateKey) {
+            const hasOwnImageKey =
+                (settings?.providersKeys?.replicate && settings.providersKeys.replicate.length > 0) ||
+                (settings?.providersKeys?.huggingface && settings.providersKeys.huggingface.length > 0);
+
+            if (hasOwnImageKey) {
                 setGenerationsLeft('Ilimitado');
             } else if (apiKeyData) {
                 const today = new Date().toISOString().split('T')[0];
                 if (apiKeyData.last_generation_date !== today) {
-                    setGenerationsLeft(40);
+                    setGenerationsLeft(100);
                 } else if (apiKeyData.daily_generations !== null) {
                     setGenerationsLeft(apiKeyData.daily_generations);
                 }
@@ -100,6 +108,56 @@ export default function FabricaCreativaPage() {
             console.error("Error fetching angles:", error);
         } finally {
             setIsFetching(false);
+        }
+    };
+
+    const fetchSavedCreatives = async () => {
+        if (!activeProjectId || !userId) return;
+        try {
+            const token = await getToken({ template: 'supabase' });
+            if (!token) return;
+            const supabaseAuth = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                { global: { headers: { Authorization: `Bearer ${token}` } } }
+            );
+
+            const { data, error } = await supabaseAuth
+                .from('creatives')
+                .select('*')
+                .eq('project_id', activeProjectId)
+                .order('created_at', { ascending: false });
+
+            if (!error && data) {
+                setSavedCreatives(data);
+            }
+        } catch (error) {
+            console.error("Error fetching saved creatives:", error);
+        }
+    };
+
+    const handleDeleteCreative = async (creativeId: string) => {
+        const confirmDelete = window.confirm("¿Estás seguro de que deseas eliminar este creativo de tu proyecto?");
+        if (!confirmDelete) return;
+
+        const loadingToast = toast.loading("Eliminando creativo...", { icon: '🗑️' });
+
+        try {
+            const res = await fetch("/api/delete-creative", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ creativeId })
+            });
+
+            const data = await res.json();
+            if (!res.ok || data.error) throw new Error(data.error || "Falló la eliminación");
+
+            setSavedCreatives(prev => prev.filter(c => c.id !== creativeId));
+            toast.success("Creativo eliminado correctamente.", { id: loadingToast, icon: '✅' });
+
+        } catch (error: any) {
+            console.error("Delete creative error", error);
+            toast.error(error.message || "No se pudo eliminar el creativo.", { id: loadingToast });
         }
     };
 
@@ -115,6 +173,7 @@ export default function FabricaCreativaPage() {
                 analysis: project.analysis
             });
             fetchAngles();
+            fetchSavedCreatives();
         } else {
             // FALLBACK DUMMY DATA OR NO ANGLES
             setAngles(FALLBACK_ANGLES);
@@ -128,6 +187,11 @@ export default function FabricaCreativaPage() {
     }, [activeProjectId, projects, userId]);
 
     const handleGenerate = async () => {
+        if (!settings?.geminiKey || settings.geminiKey.trim() === "") {
+            setIsApiKeyModalOpen(true);
+            return;
+        }
+
         if (!selectedAngleId) return;
 
         const count = parseInt(variantCount) || 1;
@@ -167,7 +231,14 @@ export default function FabricaCreativaPage() {
                 body: JSON.stringify(payload)
             });
 
-            const data = await res.json();
+            const responseText = await res.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (e) {
+                console.error("Non-JSON response from server:", responseText.substring(0, 200));
+                throw new Error("El servidor devolvió un error inesperado. Por favor, revisa la consola para más detalles.");
+            }
 
             if (!res.ok || data.error) {
                 throw new Error(data.error || "Error en la respuesta del servidor");
@@ -224,6 +295,7 @@ export default function FabricaCreativaPage() {
                 }
                 setIsGenerating(false);
                 toast.success("Creativos generados existosamente.");
+                fetchSavedCreatives();
             }
 
         } catch (error: any) {
@@ -301,130 +373,167 @@ export default function FabricaCreativaPage() {
 
     return (
         <div className="flex flex-col gap-8 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-            <div className="text-center sm:text-left flex flex-col items-center sm:items-start">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400 font-medium mb-4">
-                    <Factory className="w-3.5 h-3.5" />
-                    Producción Final
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400 font-medium mb-4">
+                        <Wand2 className="w-3.5 h-3.5" />
+                        Fábrica Creativa
+                    </div>
+                    <h1 className="text-4xl font-black tracking-tight mb-2 text-white">
+                        Generador de <span className="text-cyan-400">Contenido</span>
+                    </h1>
+                    <p className="text-zinc-500 text-sm max-w-2xl">
+                        Visualiza, genera y escala tus creativos ganadores.
+                    </p>
                 </div>
-                <h1 className="text-4xl font-bold tracking-tight mb-2">
-                    Fábrica <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">Creativa</span>
-                </h1>
-                <p className="text-zinc-400 text-lg max-w-2xl">
-                    Combina tus formatos, estilo visual y ángulos guardados para renderizar anuncios listos para publicar.
-                </p>
-                <div className="flex flex-wrap items-center gap-3 mt-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm font-medium text-zinc-300">
-                        <Gauge className={`w-4 h-4 ${generationsLeft === 'Ilimitado' || generationsLeft > 10 ? 'text-emerald-400' : 'text-amber-400'}`} />
-                        <span>Límite Diario: </span>
-                        <strong className={generationsLeft === 'Ilimitado' || generationsLeft > 10 ? "text-white" : "text-amber-400"}>
-                            {generationsLeft === 'Ilimitado' ? 'Ilimitado' : `${generationsLeft} restantes`}
-                        </strong>
+
+                <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <div className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-xs font-semibold text-violet-300 whitespace-nowrap">
+                        Límite Diario: {generationsLeft} restantes
                     </div>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm font-medium text-blue-200">
-                        <AlertTriangle className="w-4 h-4 text-blue-400" />
-                        <span>Aviso: Las imágenes generadas se eliminan automáticamente tras <strong>7 días</strong>. ¡Descárgalas a tiempo!</span>
+                    <div className="flex gap-1 bg-white/5 rounded-full p-1 border border-white/10 text-xs text-zinc-400 font-medium shrink-0">
+                        {["1:1", "4:5", "9:16", "16:9", "4:3"].map((fmt) => (
+                            <button
+                                key={fmt}
+                                onClick={() => setGenerationFormat(fmt)}
+                                className={`px-4 py-2 rounded-full transition-colors ${generationFormat === fmt ? "bg-cyan-900/50 text-cyan-400" : "hover:text-white"}`}
+                            >
+                                {fmt}
+                            </button>
+                        ))}
                     </div>
+                    <Button
+                        onClick={handleGenerate}
+                        disabled={isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))}
+                        className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-6 h-10 shadow-[0_0_20px_rgba(124,58,237,0.3)] shrink-0 font-semibold"
+                    >
+                        {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : (
+                            <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        )}
+                        Generar Todo (Masters)
+                    </Button>
                 </div>
             </div>
 
-            <Card className="bg-zinc-950/60 border-white/10 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
 
-                <CardContent className="p-6 sm:p-8 space-y-6 relative z-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                            <label className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                                Ángulo a Renderizar
-                            </label>
+
+            <Card className="bg-[#0B0A0F] border-white/5 shadow-2xl relative overflow-hidden rounded-3xl">
+                <CardContent className="p-6 md:p-10 flex flex-col md:flex-row gap-10 min-h-[500px]">
+
+                    {/* LEFT CONTENT */}
+                    <div className="flex-1 flex flex-col justify-between space-y-8">
+                        <div>
+                            <span className="inline-block px-3 py-1 bg-white/5 border border-white/5 rounded-full text-[10px] text-zinc-400 font-bold tracking-wider mb-6">
+                                Ángulo Generado
+                            </span>
+
+                            {/* ANGLE SELECTOR */}
                             <Select value={selectedAngleId} onValueChange={setSelectedAngleId}>
-                                <SelectTrigger className="w-full bg-black/50 border-white/10 h-14 text-base focus:ring-cyan-500 rounded-xl">
-                                    <SelectValue placeholder="Selecciona un ángulo" />
+                                <SelectTrigger className="w-full bg-transparent border-0 p-0 h-auto text-2xl md:text-3xl font-bold text-white mb-6 focus:ring-0 [&>svg]:hidden hover:opacity-80 transition-opacity">
+                                    <h2 className="text-left leading-tight truncate-multiline">
+                                        {angles.find(a => a.id === selectedAngleId)?.text || "Escribe tu gancho aquí..."}
+                                    </h2>
                                 </SelectTrigger>
                                 <SelectContent className="bg-zinc-900 border-white/10 max-h-60">
                                     {angles.map((a) => (
                                         <SelectItem key={a.id} value={a.id} className="py-3 cursor-pointer">
-                                            <span className="line-clamp-1">{a.text}</span>
+                                            <span className="line-clamp-2">{a.text}</span>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
+
+                            <div className="bg-[#050505] border border-white/5 rounded-2xl p-6 space-y-6">
+                                <div>
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider mb-2 block">VISUAL</label>
+                                    <Select value={generationStyle} onValueChange={setGenerationStyle}>
+                                        <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-zinc-900 border-white/10">
+                                            <SelectItem value="brand">Identidad de Marca</SelectItem>
+                                            <SelectItem value="free">Estilo Libre</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
+                                    {generationStyle === 'brand' && (
+                                        <div className="mt-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
+                                            <p className="text-zinc-300 text-xs italic line-clamp-2">
+                                                ★ {projectContext?.visualStyle || "Estilo visual no definido"}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-white/5 pt-6">
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">FORMATO</label>
+                                    <Select value={generationFormat} onValueChange={setGenerationFormat}>
+                                        <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-zinc-900 border-white/10">
+                                            <SelectItem value="1:1">Cuadrado (1:1)</SelectItem>
+                                            <SelectItem value="4:5">Feed (4:5)</SelectItem>
+                                            <SelectItem value="9:16">Stories/Reels (9:16)</SelectItem>
+                                            <SelectItem value="16:9">Wide (16:9)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-4">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">MODELO DE IA</label>
+                                        <Select value={generationModel} onValueChange={setGenerationModel}>
+                                            <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-zinc-900 border-white/10">
+                                                <SelectItem value="flux-pro">Flux 1.1 Pro</SelectItem>
+                                                <SelectItem value="sdxl">SD XL</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">VARIANTES</label>
+                                        <Select value={variantCount} onValueChange={setVariantCount}>
+                                            <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-zinc-900 border-white/10">
+                                                {[1, 2, 4].map(n => <SelectItem key={n} value={n.toString()}>{n} Imágenes</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="space-y-3">
-                            <label className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                                Número de Variantes
-                            </label>
-                            <Select value={variantCount} onValueChange={setVariantCount}>
-                                <SelectTrigger className="w-full bg-black/50 border-white/10 h-14 text-base focus:ring-cyan-500 rounded-xl">
-                                    <SelectValue placeholder="Cantidad" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10">
-                                    {[1, 2, 4, 6, 8, 10].map((num) => (
-                                        <SelectItem key={num.toString()} value={num.toString()} className="cursor-pointer">
-                                            {num} {num === 1 ? 'Variante' : 'Variantes'}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-3 md:col-span-2 lg:col-span-1">
-                            <label className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                                Dirección de Arte
-                            </label>
-                            <Select value={generationStyle} onValueChange={setGenerationStyle}>
-                                <SelectTrigger className="w-full bg-black/50 border-white/10 h-14 text-base focus:ring-cyan-500 rounded-xl">
-                                    <SelectValue placeholder="Estilo..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10">
-                                    <SelectItem value="brand" className="cursor-pointer">Seguir Identidad de Marca</SelectItem>
-                                    <SelectItem value="free" className="cursor-pointer">Estilo Libre / Extravagante</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-3 md:col-span-2 lg:col-span-1">
-                            <label className="text-sm font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                                Modelo de Renderizado
-                            </label>
-                            <Select value={generationModel} onValueChange={setGenerationModel}>
-                                <SelectTrigger className="w-full bg-black/50 border-white/10 h-14 text-base focus:ring-cyan-500 rounded-xl">
-                                    <SelectValue placeholder="Modelo..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10">
-                                    <SelectItem value="flux-pro" className="cursor-pointer">Flux 1.1 Pro (Ultra Realista / Estilo Gemini)</SelectItem>
-                                    <SelectItem value="sdxl" className="cursor-pointer">SDXL (Rápido / Standard)</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div>
+                            <Button
+                                onClick={handleGenerate}
+                                disabled={isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))}
+                                className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-8 py-6 font-semibold shadow-[0_4px_20px_rgba(124,58,237,0.3)] w-full sm:w-auto"
+                            >
+                                {isGenerating ? <Loader2 className="w-5 h-5 mr-3 animate-spin" /> : <Wand2 className="w-5 h-5 mr-3 text-cyan-300" />}
+                                {isGenerating ? 'Generando...' : 'Generar Imagen Principal'}
+                            </Button>
                         </div>
                     </div>
 
-                    <div className="pt-4 flex justify-between items-center">
-                        <p className="text-xs text-zinc-500 flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                            {generationsLeft === 'Ilimitado'
-                                ? "Renderizando vía Personal Key."
-                                : `Renderizando usando modelo High-Res. Consumirá ${variantCount} créditos.`}
-                        </p>
-                        <Button
-                            onClick={handleGenerate}
-                            disabled={isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))}
-                            className={`px-8 py-6 rounded-full font-bold shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all ${isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))
-                                ? "bg-zinc-800 text-zinc-400 border border-white/5"
-                                : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white"
-                                }`}
-                        >
-                            {isGenerating ? (
-                                <span className="flex items-center gap-2 text-base">
-                                    <Wand2 className="w-5 h-5 animate-spin" /> Renderizando IA...
-                                </span>
-                            ) : (
-                                <span className="flex items-center gap-2 text-base">
-                                    <Wand2 className="w-5 h-5" /> Generar Creativos
-                                </span>
-                            )}
-                        </Button>
+                    {/* RIGHT CONTENT (IMAGE PLACEHOLDER/RESULT) */}
+                    <div className="w-full md:w-[400px] shrink-0 flex flex-col items-center justify-center">
+                        {generatedImages.length > 0 ? (
+                            <div className="relative w-full rounded-3xl overflow-hidden shadow-2xl border border-white/10 group">
+                                <img src={generatedImages[0]} crossOrigin="anonymous" className="w-full h-auto" />
+                            </div>
+                        ) : (
+                            <div className={`w-full ${generationFormat === '9:16' ? 'aspect-[9/16]' : generationFormat === '16:9' ? 'aspect-[16/9]' : generationFormat === '1:1' ? 'aspect-square' : 'aspect-[4/5]'} rounded-3xl border-2 border-dashed border-white/5 bg-white/[0.02] flex flex-col items-center justify-center text-zinc-600 transition-all`}>
+                                <ImageIcon className="w-10 h-10 mb-4 opacity-50" />
+                                <span className="text-sm font-medium">Imagen pendiente</span>
+                            </div>
+                        )}
                     </div>
+
                 </CardContent>
             </Card>
 
@@ -467,6 +576,52 @@ export default function FabricaCreativaPage() {
                     </div>
                 </div>
             )}
+
+            {/* Historial de Creativos del Proyecto */}
+            {savedCreatives.length > 0 && !isGenerating && (
+                <div className="space-y-6 mt-16 border-t border-white/10 pt-16 animate-in slide-in-from-bottom-8 duration-700">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <h2 className="text-2xl font-bold flex items-center gap-3 text-zinc-300">
+                            <ImageIcon className="w-6 h-6 text-zinc-500" /> Archivo de Creativos
+                        </h2>
+                    </div>
+
+                    {savedCreatives.length === 0 ? (
+                        <div className="p-12 border border-white/5 rounded-2xl bg-zinc-900/50 flex flex-col items-center justify-center text-center">
+                            <ImageIcon className="w-12 h-12 text-zinc-600 mb-4 opacity-50" />
+                            <h3 className="text-zinc-400 font-medium">No hay creativos guardados</h3>
+                            <p className="text-xs text-zinc-600 mt-2 max-w-sm">Los creativos que generes para este proyecto aparecerán aquí y formarán parte del historial contable de tu Dashboard.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            {savedCreatives.map((creative) => (
+                                <div key={creative.id} className="group relative rounded-xl overflow-hidden aspect-square bg-zinc-900 border border-white/5 hover:border-white/20 transition-all">
+                                    <img
+                                        src={creative.image_url}
+                                        alt="Creativo Guardado"
+                                        className="object-cover w-full h-full"
+                                        crossOrigin="anonymous"
+                                    />
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-2 p-4">
+                                        <Button size="sm" onClick={() => handleDownloadSingle(creative.image_url, 0)} className="w-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md">
+                                            <Download className="w-4 h-4 mr-2" /> Descargar
+                                        </Button>
+                                        <Button size="sm" onClick={() => handleDeleteCreative(creative.id)} className="w-full bg-red-500/20 hover:bg-red-500 hover:text-white text-red-200 backdrop-blur-md transition-colors border border-red-500/30">
+                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            <ApiKeyModal
+                isOpen={isApiKeyModalOpen}
+                onClose={() => setIsApiKeyModalOpen(false)}
+                onSuccess={() => { toast.success("API Key guardada. Ahora puedes generar creativos.") }}
+            />
         </div>
     );
 }

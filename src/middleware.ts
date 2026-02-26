@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 // Protegemos todas las rutas excepto la landing page y el webhook.
-const isPublicRoute = createRouteMatcher(["/", "/api/webhooks/clerk(.*)"]);
+const isPublicRoute = createRouteMatcher(["/", "/api/webhooks/clerk(.*)", "/api/webhooks/generate"]);
 
 export default clerkMiddleware(async (auth, req) => {
     if (!isPublicRoute(req)) {

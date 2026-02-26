@@ -29,11 +29,11 @@ export default async function LandingPage() {
                             Solo por tiempo limitado: la app creativa desde <strong className="text-yellow-300">$49.99/mensual</strong> con planes exclusivos.
                         </span>
                         <span className="hidden sm:inline-block mx-2 opacity-50">•</span>
-                        <SignUpButton fallbackRedirectUrl="/dashboard" mode="modal">
+                        <SignInButton fallbackRedirectUrl="/dashboard" mode="modal">
                             <button className="underline decoration-white/50 underline-offset-4 hover:decoration-white transition-all font-bold group-hover:text-yellow-200">
-                                ¡Aprovecha ahora!
+                                Acceder
                             </button>
-                        </SignUpButton>
+                        </SignInButton>
                     </p>
                 </div>
             </SignedOut>
@@ -49,11 +49,8 @@ export default async function LandingPage() {
                 <div className="flex items-center gap-4">
                     <SignedOut>
                         <SignInButton fallbackRedirectUrl="/dashboard" mode="modal">
-                            <Button variant="ghost" className="text-zinc-300 hover:text-white font-medium">Iniciar Sesión</Button>
+                            <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-6 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">Iniciar Sesión</Button>
                         </SignInButton>
-                        <SignUpButton fallbackRedirectUrl="/dashboard" mode="modal">
-                            <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-6 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">Registro</Button>
-                        </SignUpButton>
                     </SignedOut>
                 </div>
             </header>
@@ -75,11 +72,11 @@ export default async function LandingPage() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-10 duration-1000 z-10">
-                    <SignUpButton fallbackRedirectUrl="/dashboard" mode="modal">
-                        <Button className="bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white rounded-full px-8 py-6 text-lg font-bold shadow-[0_0_30px_rgba(236,72,153,0.3)] border-0">
-                            Empezar Gratis <ArrowRight className="w-5 h-5 ml-2" />
+                    <SignInButton fallbackRedirectUrl="/dashboard" mode="modal">
+                        <Button className="bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white rounded-full px-10 py-7 text-xl font-bold shadow-[0_0_40px_rgba(236,72,153,0.3)] border-0 transition-transform hover:scale-105">
+                            Acceso Privado <ArrowRight className="w-6 h-6 ml-2" />
                         </Button>
-                    </SignUpButton>
+                    </SignInButton>
                 </div>
 
                 {/* Features Grid */}

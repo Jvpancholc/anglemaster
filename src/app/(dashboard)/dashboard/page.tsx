@@ -16,12 +16,39 @@ export default function DashboardIndexPage() {
   const { getToken } = useAuth();
   const { projects, setActiveProject, createProject, deleteProject } = useProjectStore();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [creativesCount, setCreativesCount] = useState(0);
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+
+    // Fetch total creatives count
+    const fetchStats = async () => {
+      if (!user) return;
+      try {
+        const token = await getToken({ template: 'supabase' });
+        if (!token) return;
+        const supabaseAuth = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          { global: { headers: { Authorization: `Bearer ${token}` } } }
+        );
+        const { count, error } = await supabaseAuth
+          .from('creatives')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+
+        if (!error && count !== null) {
+          setCreativesCount(count);
+        }
+      } catch (err) {
+        console.error("Failed to fetch stats", err);
+      }
+    };
+
+    fetchStats();
+  }, [user, getToken]);
 
   const handleCreateProject = async () => {
     try {
@@ -140,34 +167,40 @@ export default function DashboardIndexPage() {
 
         <div className="flex flex-col gap-4 w-full lg:w-auto">
           <div className="flex gap-4">
-            <Card className="bg-zinc-950/60 border-white/10 w-full lg:w-48 shadow-lg">
-              <CardContent className="p-4 flex flex-col justify-between h-full min-h-[100px]">
-                <Factory className="w-5 h-5 text-indigo-400 mb-2 opacity-70" />
-                <div>
-                  <p className="text-2xl font-bold">{projects.length}</p>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium mt-1">Proyectos Activos</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-zinc-950/60 border-white/10 w-full lg:w-48 shadow-lg">
-              <CardContent className="p-4 flex flex-col justify-between h-full min-h-[100px]">
-                <Target className="w-5 h-5 text-fuchsia-400 mb-2 opacity-70" />
-                <div>
-                  <p className="text-2xl font-bold">0</p>
-                  <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium mt-1">Creativos Generados</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="#mis-proyectos" className="w-full lg:w-48 block">
+              <Card className="bg-zinc-950/60 border-white/10 h-full shadow-lg hover:border-indigo-500/50 transition-colors">
+                <CardContent className="p-4 flex flex-col justify-between h-full min-h-[100px]">
+                  <Factory className="w-5 h-5 text-indigo-400 mb-2 opacity-70" />
+                  <div>
+                    <p className="text-2xl font-bold">{projects.length}</p>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium mt-1">Proyectos Activos</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/fabrica" className="w-full lg:w-48 block">
+              <Card className="bg-zinc-950/60 border-white/10 h-full shadow-lg hover:border-fuchsia-500/50 transition-colors">
+                <CardContent className="p-4 flex flex-col justify-between h-full min-h-[100px]">
+                  <Target className="w-5 h-5 text-fuchsia-400 mb-2 opacity-70" />
+                  <div>
+                    <p className="text-2xl font-bold">{creativesCount}</p>
+                    <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium mt-1">Creativos Generados</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
-          <Card className="bg-zinc-950/60 border-white/10 w-full shadow-lg relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-30 group-hover:opacity-100 transition-opacity">
-              <Rocket className="w-4 h-4 text-emerald-400" />
-            </div>
-            <CardContent className="p-4 flex flex-col justify-center min-h-[80px]">
-              <p className="text-2xl font-bold text-emerald-400">0</p>
-              <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium mt-1">Aprobados para Publicar</p>
-            </CardContent>
-          </Card>
+          <Link href="/fabrica" className="block">
+            <Card className="bg-zinc-950/60 border-white/10 w-full shadow-lg relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
+              <div className="absolute top-0 right-0 p-4 opacity-30 group-hover:opacity-100 transition-opacity">
+                <Rocket className="w-4 h-4 text-emerald-400" />
+              </div>
+              <CardContent className="p-4 flex flex-col justify-center min-h-[80px]">
+                <p className="text-2xl font-bold text-emerald-400">0</p>
+                <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium mt-1">Aprobados para Publicar</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </div>
 
@@ -236,7 +269,7 @@ export default function DashboardIndexPage() {
       </div>
 
       {/* My Projects */}
-      <div>
+      <div id="mis-proyectos" className="scroll-mt-8">
         <h2 className="text-xl font-bold tracking-tight mb-4 flex items-center gap-2">
           <span className="text-emerald-500">📁</span> Mis Proyectos
         </h2>

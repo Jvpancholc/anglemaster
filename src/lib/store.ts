@@ -39,10 +39,18 @@ export interface Project {
     updatedAt: string;
 }
 
+export interface ProviderKeysConfig {
+    gemini?: string[];
+    groq?: string[];
+    replicate?: string[];
+    huggingface?: string[];
+}
+
 export interface ProjectSettings {
     openAiKey?: string | null;
     replicateKey?: string | null;
     geminiKey?: string | null;
+    providersKeys?: ProviderKeysConfig;
     aiProvider?: string;
     language?: string;
 }
@@ -96,8 +104,14 @@ const defaultSettings: ProjectSettings = {
     openAiKey: '',
     replicateKey: '',
     geminiKey: '',
+    providersKeys: {
+        gemini: [],
+        groq: [],
+        replicate: [],
+        huggingface: []
+    },
     aiProvider: 'openai',
-    language: 'Español'
+    language: 'ES'
 };
 
 export const useProjectStore = create<ProjectState>()(

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Palette, Type, Image as ImageIcon, Sparkles, Save, Wand2, UploadCloud, UserCircle, ImagePlus } from "lucide-react";
@@ -25,6 +25,7 @@ export default function IdentidadVisualPage() {
     const [primaryColor, setPrimaryColor] = useState("#6366F1");
     const [secondaryColor, setSecondaryColor] = useState("#A855F7");
     const [selectedFont, setSelectedFont] = useState("Inter");
+    const [fontPreviewText, setFontPreviewText] = useState("Ángulos ganadores.");
     const [slogan, setSlogan] = useState("");
     const [includeSlogan, setIncludeSlogan] = useState(false);
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -34,9 +35,6 @@ export default function IdentidadVisualPage() {
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [pendingImage, setPendingImage] = useState<string | null>(null);
-
-    const [styleReferenceFiles, setStyleReferenceFiles] = useState<File[]>([]);
-    const [faceImageFiles, setFaceImageFiles] = useState<File[]>([]);
 
     useEffect(() => {
         if (!activeProjectId) {
@@ -75,23 +73,6 @@ export default function IdentidadVisualPage() {
     const handleAISelectLogo = async (url: string) => {
         setLogoPreview(url);
         setLogoUrl(url);
-    };
-
-    const handleStyleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setStyleReferenceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
-        }
-    };
-
-    const handleFaceFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const newFiles = Array.from(e.target.files);
-            if (faceImageFiles.length + newFiles.length > 5) {
-                toast.error("Puedes subir un máximo de 5 fotos de rostro.");
-                return;
-            }
-            setFaceImageFiles(prev => [...prev, ...newFiles]);
-        }
     };
 
     const handleSave = async () => {
@@ -135,40 +116,6 @@ export default function IdentidadVisualPage() {
                 finalLogoUrl = publicUrlData.publicUrl;
             }
 
-            // Upload Style References
-            const uploadedStyleUrls: string[] = [];
-            for (const file of styleReferenceFiles) {
-                const fileExt = file.name.split(".").pop();
-                const fileName = `${activeProjectId}/${Date.now()}_style_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const { error: uploadError } = await supabaseAuth.storage
-                    .from("style-references")
-                    .upload(fileName, file, { upsert: true });
-
-                if (!uploadError) {
-                    const { data } = supabaseAuth.storage.from("style-references").getPublicUrl(fileName);
-                    uploadedStyleUrls.push(data.publicUrl);
-                } else {
-                    console.error("Error subiendo referencia de estilo:", uploadError);
-                }
-            }
-
-            // Upload Face Images
-            const uploadedFaceUrls: string[] = [];
-            for (const file of faceImageFiles) {
-                const fileExt = file.name.split(".").pop();
-                const fileName = `${activeProjectId}/${Date.now()}_face_${Math.random().toString(36).substring(7)}.${fileExt}`;
-                const { error: uploadError } = await supabaseAuth.storage
-                    .from("face-images")
-                    .upload(fileName, file, { upsert: true });
-
-                if (!uploadError) {
-                    const { data } = supabaseAuth.storage.from("face-images").getPublicUrl(fileName);
-                    uploadedFaceUrls.push(data.publicUrl);
-                } else {
-                    console.error("Error subiendo foto de rostro:", uploadError);
-                }
-            }
-
             const dataToSave = {
                 project_id: activeProjectId,
                 user_id: user.id,
@@ -178,7 +125,6 @@ export default function IdentidadVisualPage() {
                 font: selectedFont,
                 slogan: slogan,
                 include_slogan: includeSlogan,
-                style_references: uploadedStyleUrls,
                 // face_images: uploadedFaceUrls // Requiere columna 'face_images' en base de datos
             };
 
@@ -362,28 +308,44 @@ export default function IdentidadVisualPage() {
                                         <SelectValue placeholder="Selecciona una fuente" />
                                     </SelectTrigger>
                                     <SelectContent className="max-h-[300px]">
-                                        <SelectItem value="Inter">Inter</SelectItem>
-                                        <SelectItem value="Roboto">Roboto</SelectItem>
-                                        <SelectItem value="Open Sans">Open Sans</SelectItem>
-                                        <SelectItem value="Lato">Lato</SelectItem>
-                                        <SelectItem value="Montserrat">Montserrat</SelectItem>
-                                        <SelectItem value="Oswald">Oswald</SelectItem>
-                                        <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
-                                        <SelectItem value="Slabo 27px">Slabo 27px</SelectItem>
-                                        <SelectItem value="PT Serif">PT Serif</SelectItem>
-                                        <SelectItem value="Merriweather">Merriweather</SelectItem>
+                                        <SelectGroup>
+                                            <SelectLabel className="text-zinc-500 uppercase tracking-wider text-xs font-bold">Sans Serif (Modernas & Limpias)</SelectLabel>
+                                            <SelectItem value="Inter">Inter</SelectItem>
+                                            <SelectItem value="Roboto">Roboto</SelectItem>
+                                            <SelectItem value="Open Sans">Open Sans</SelectItem>
+                                            <SelectItem value="Lato">Lato</SelectItem>
+                                            <SelectItem value="Montserrat">Montserrat</SelectItem>
+                                            <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
+                                        </SelectGroup>
+                                        <SelectGroup>
+                                            <SelectLabel className="text-zinc-500 uppercase tracking-wider text-xs font-bold mt-2">Serif (Clásicas & Elegantes)</SelectLabel>
+                                            <SelectItem value="PT Serif">PT Serif</SelectItem>
+                                            <SelectItem value="Merriweather">Merriweather</SelectItem>
+                                            <SelectItem value="Slabo 27px">Slabo 27px</SelectItem>
+                                        </SelectGroup>
+                                        <SelectGroup>
+                                            <SelectLabel className="text-zinc-500 uppercase tracking-wider text-xs font-bold mt-2">Display (Impactantes)</SelectLabel>
+                                            <SelectItem value="Oswald">Oswald</SelectItem>
+                                        </SelectGroup>
                                     </SelectContent>
                                 </Select>
 
                                 {/* Vista previa tipografía */}
-                                <div className="mt-8 p-6 bg-gradient-to-br from-white/5 to-white/0 border border-white/5 rounded-xl text-center">
-                                    <span className="text-sm text-zinc-500 block mb-2 font-medium">Vista Previa</span>
-                                    <p className="text-4xl text-white tracking-tight" style={{ fontFamily: selectedFont }}>
-                                        Ángulos ganadores.
-                                    </p>
-                                    <p className="text-zinc-400 mt-2" style={{ fontFamily: selectedFont }}>
-                                        El perro rápido salta sobre el zorro perezoso.
-                                    </p>
+                                <div className="mt-8 space-y-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Texto de Prueba</Label>
+                                        <Input
+                                            value={fontPreviewText}
+                                            onChange={(e) => setFontPreviewText(e.target.value)}
+                                            placeholder="Escribe algo para probar la fuente..."
+                                            className="bg-black/30 border-white/10 focus-visible:ring-sky-500"
+                                        />
+                                    </div>
+                                    <div className="p-8 bg-gradient-to-br from-white/5 to-white/0 border border-white/5 rounded-xl text-center min-h-[120px] flex items-center justify-center overflow-hidden">
+                                        <p className="text-3xl sm:text-4xl text-white tracking-tight break-words max-w-full" style={{ fontFamily: selectedFont }}>
+                                            {fontPreviewText || "Escribe algo..."}
+                                        </p>
+                                    </div>
                                 </div>
                             </CardContent>
                         </div>

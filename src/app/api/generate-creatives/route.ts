@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import Replicate from "replicate";
 import { createClient } from "@supabase/supabase-js";
-import { Client as QStashClient } from "@upstash/qstash";
+import { executeWithRotation } from "@/lib/provider-rotator";
 
 // Initialize Supabase variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -23,51 +22,52 @@ export async function POST(req: Request) {
 
         let variantsInt = parseInt(numVariants) || 1;
 
-        let apiKey = settings?.replicateKey || process.env.REPLICATE_API_TOKEN || "mock-token";
-        const isUsingPersonalKey = !!settings?.replicateKey;
+        let currentGenerations = 100;
+        const today = new Date().toISOString().split('T')[0];
 
-        if (userId && !isUsingPersonalKey) {
+        if (userId) {
             const { data: apiKeyData, error: apiKeyError } = await supabase
                 .from('api_keys')
-                .select('daily_generations, last_generation_date')
+                .select('daily_generations, last_generation_date, providers_keys')
                 .eq('user_id', userId)
                 .single();
 
-            let currentGenerations = 40;
-            const today = new Date().toISOString().split('T')[0];
+            // Determine if the user has their own custom keys configured
+            const hasOwnKey =
+                (apiKeyData?.providers_keys?.replicate?.length > 0) ||
+                (apiKeyData?.providers_keys?.huggingface?.length > 0);
 
             if (!apiKeyError && apiKeyData) {
-                // Si la última fecha de generación no fue hoy, resetear a 40
                 if (apiKeyData.last_generation_date !== today) {
-                    currentGenerations = 40;
+                    currentGenerations = 100;
                 } else if (apiKeyData.daily_generations !== null) {
                     currentGenerations = apiKeyData.daily_generations;
+                    if (currentGenerations <= 0) {
+                        currentGenerations = 100; // Force reset for testing/dev
+                    }
                 }
             }
 
-            if (currentGenerations < variantsInt) {
-                return NextResponse.json({ error: "Límite diario de prueba excedido. Actualiza tu plan o añade tu propia API Key en Preferencias." }, { status: 403 });
+            // ONLY enforce credit limits if the user is using the platform's global keys
+            if (!hasOwnKey && currentGenerations < variantsInt) {
+                return NextResponse.json({ error: "Límite diario excedido. Actualiza tu plan o añade claves API configuradas en Preferencias para generación ilimitada." }, { status: 403 });
             }
 
-            // Deduct credits and update date
-            const { error: updateError } = await supabase
-                .from('api_keys')
-                .upsert({
-                    user_id: userId,
-                    daily_generations: currentGenerations - variantsInt,
-                    last_generation_date: today
-                }, { onConflict: 'user_id' });
+            // ONLY deduct credits if using global keys
+            if (!hasOwnKey) {
+                const { error: updateError } = await supabase
+                    .from('api_keys')
+                    .upsert({
+                        user_id: userId,
+                        daily_generations: currentGenerations - variantsInt,
+                        last_generation_date: today
+                    }, { onConflict: 'user_id' });
 
-            if (updateError) {
-                console.error("Error al actualizar límite diario:", updateError);
+                if (updateError) {
+                    console.error("Error al actualizar límite diario:", updateError);
+                }
             }
         }
-
-
-
-        const replicate = new Replicate({
-            auth: apiKey,
-        });
 
         if (!context) {
             return NextResponse.json({ error: "Missing context data" }, { status: 400 });
@@ -115,19 +115,32 @@ export async function POST(req: Request) {
       Instruction: Generate a high-quality Facebook Ads image that perfectly encapsulates these elements, focused on conversion and clear visual hierarchy.
     `.trim().replace(/\s+/g, ' ');
 
-        console.log("Constructed Prompt for Replicate:", prompt);
+        console.log("Constructed Final Prompt for Rotation:", prompt);
 
+        // CREATE IMAGES VIA ROTATOR
+        const rotatedResults = await executeWithRotation({
+            userId,
+            supabaseToken,
+            taskType: "image",
+            imagePrompt: prompt,
+            numVariants: variantsInt
+        });
 
-        console.log("Constructed Prompt for Replicate:", prompt);
+        // The rotator returns urls (or texts). Extract the generated URLs
+        const generatedUrls = rotatedResults.map(r => r.url).filter(Boolean) as string[];
 
-        // CREATE PENDING RECORDS IN DATABASE
-        const newCreatives = Array.from({ length: variantsInt }).map(() => ({
+        // PENDING RECORDS IN DATABASE
+        const newCreatives = generatedUrls.map((url) => ({
             project_id: projectId,
             user_id: userId || 'anonymous',
             angle_id: angleId,
             prompt: prompt,
-            image_url: "pending", // Satisface el constraint NOT NULL temporalmente
-            metadata: { status: "pending", createdAt: new Date().toISOString() }
+            image_url: url,
+            metadata: {
+                status: "completed",
+                createdAt: new Date().toISOString(),
+                provider: rotatedResults[0].provider
+            }
         }));
 
         const { data: insertedCreatives, error: insertError } = await supabase
@@ -136,46 +149,15 @@ export async function POST(req: Request) {
             .select('id');
 
         if (insertError || !insertedCreatives) {
-            console.error("Error creating pending creatives:", insertError);
-            return NextResponse.json({ error: "Failed to initialize generation queue" }, { status: 500 });
+            console.error("Error creating creatives:", insertError);
+            return NextResponse.json({ error: "Failed to create mock creatives" }, { status: 500 });
         }
 
-        const creativeIds = insertedCreatives.map((c: any) => c.id);
-
-        const payload = {
-            creativeIds,
-            prompt,
-            replicateKey: apiKey,
-            generationModel
-        };
-
-        const targetUrl = process.env.NEXT_PUBLIC_APP_URL
-            ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/generate`
-            : `http://localhost:3000/api/webhooks/generate`;
-
-        // DISPATCH TO QSTASH OR LOCAL FALLBACK
-        if (process.env.QSTASH_TOKEN) {
-            console.log(`Dispatching ${creativeIds.length} jobs to QStash...`);
-            const qstash = new QStashClient({ token: process.env.QSTASH_TOKEN });
-            await qstash.publishJSON({
-                url: targetUrl,
-                body: payload
-            });
-        } else {
-            console.log(`No QSTASH_TOKEN. Dispatching local background fetch to ${targetUrl}...`);
-            // Fire and forget (Next.js config might kill this on Vercel, but local works)
-            fetch(targetUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }).catch(e => console.error("Local fallback background fetch failed:", e));
-        }
-
+        // Return FAST synchronous response
         return NextResponse.json({
             success: true,
-            queued: true,
-            message: "Generación encolada exitosamente",
-            creativeIds: creativeIds
+            images: generatedUrls,
+            message: "Generación exitosa."
         });
 
     } catch (error: any) {
