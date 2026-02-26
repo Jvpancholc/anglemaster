@@ -39,7 +39,7 @@ export function AppSync() {
                     .single();
 
                 if (apiError && apiError.code !== 'PGRST116') {
-                    console.error("Error buscando API keys:", apiError);
+                    // console.error("Error buscando API keys:", apiError);
                 }
 
                 if (apiData?.providers_keys) {

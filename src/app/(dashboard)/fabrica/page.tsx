@@ -50,7 +50,7 @@ export default function FabricaCreativaPage() {
     const [generatedImages, setGeneratedImages] = useState<string[]>([]);
     const [projectContext, setProjectContext] = useState<any>(null);
     const [savedCreatives, setSavedCreatives] = useState<any[]>([]);
-    const [generationsLeft, setGenerationsLeft] = useState<number | 'Ilimitado'>(0);
+    const [generationsLeft, setGenerationsLeft] = useState<number | 'Ilimitado'>(100);
     const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
 
     const fetchAngles = async () => {
@@ -100,8 +100,14 @@ export default function FabricaCreativaPage() {
                 if (apiKeyData.last_generation_date !== today) {
                     setGenerationsLeft(100);
                 } else if (apiKeyData.daily_generations !== null) {
-                    setGenerationsLeft(apiKeyData.daily_generations);
+                    let limit = apiKeyData.daily_generations;
+                    if (limit <= 0) limit = 100; // Reset to 100 just like backend
+                    setGenerationsLeft(limit);
+                } else {
+                    setGenerationsLeft(100);
                 }
+            } else {
+                setGenerationsLeft(100); // Default for new users without api_keys row
             }
 
         } catch (error) {
