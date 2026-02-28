@@ -1,21 +1,35 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { executeWithRotation } from "@/lib/provider-rotator";
-
-// Placeholder endpoint for /api/generate-angles
-// Ready to be connected to OpenAI later.
+import { generateTextWithGemini } from "@/lib/gemini-provider";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        let { projectId, analysis, settings, userId } = body;
+        let { analysis, settings, userId } = body;
 
         if (!userId) {
             const authObj = await auth();
             userId = authObj.userId;
         }
 
-        const outputLanguage = settings?.language || 'Español';
+        // Rate limiting: 10 requests per minute per user
+        if (userId) {
+            const rateLimitResult = checkRateLimit(
+                `gen-angles:${userId}`,
+                { maxRequests: 10, windowMs: 60_000 }
+            );
+            if (!rateLimitResult.allowed) {
+                return NextResponse.json(
+                    {
+                        error: `Límite de solicitudes excedido. Intenta de nuevo en ${Math.ceil(rateLimitResult.resetIn / 1000)} segundos.`,
+                    },
+                    { status: 429 }
+                );
+            }
+        }
+
+        const outputLanguage = settings?.language || "Español";
 
         console.log(`Generating Angles in ${outputLanguage}...`);
 
@@ -28,38 +42,45 @@ Big Promise: ${analysis.promise}
 
 Generate exactly 10 short, punchy, persuasive marketing angles (one sentence each) that I can use in Facebook video ads.`;
 
-        // Execute via Rotator
-        const rotatedResults = await executeWithRotation({
+        // Generate with Gemini
+        const generatedText = await generateTextWithGemini({
             userId,
-            taskType: "text",
             systemPrompt,
-            userPrompt
+            userPrompt,
         });
 
-        const generatedText = rotatedResults[0].text || "";
-
         // Parse the returned text into an array of angles.
-        // Expecting a numbered list like "1. Angle 1\n2. Angle 2"
         let parsedAngles = generatedText
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.match(/^\d+\./)) // only keep lines starting with "Number."
-            .map(line => line.replace(/^\d+\.\s*/, '').replace(/^【.*?】\s*:\s*/, '').replace(/^\[.*?\]\s*:\s*/, '').trim())
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.match(/^\d+\./))
+            .map((line) =>
+                line
+                    .replace(/^\d+\.\s*/, "")
+                    .replace(/^【.*?】\s*:\s*/, "")
+                    .replace(/^\[.*?\]\s*:\s*/, "")
+                    .trim()
+            )
             .filter(Boolean);
 
-        // Fallback safety if the regex failed to parse exactly 10
         if (parsedAngles.length === 0) {
-            console.warn("AI didn't return a numbered list properly. Returning raw split lines.");
-            parsedAngles = generatedText.split('\n').map(l => l.trim()).filter(l => l.length > 10).slice(0, 10);
+            console.warn("AI didn't return a numbered list properly.");
+            parsedAngles = generatedText
+                .split("\n")
+                .map((l) => l.trim())
+                .filter((l) => l.length > 10)
+                .slice(0, 10);
         }
 
         return NextResponse.json({
             success: true,
-            angles: parsedAngles
+            angles: parsedAngles,
         });
-
     } catch (error: any) {
         console.error("Error generating angles:", error);
-        return NextResponse.json({ error: error.message || "Failed to generate angles" }, { status: 500 });
+        return NextResponse.json(
+            { error: error.message || "Failed to generate angles" },
+            { status: 500 }
+        );
     }
 }

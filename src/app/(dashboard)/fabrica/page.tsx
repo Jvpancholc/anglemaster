@@ -2,14 +2,32 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Factory, Wand2, Download, Image as ImageIcon, AlertTriangle, ArrowLeft, Loader2, Gauge, Trash2 } from "lucide-react";
+import {
+    Factory,
+    Wand2,
+    Download,
+    Image as ImageIcon,
+    AlertTriangle,
+    ArrowLeft,
+    Loader2,
+    Gauge,
+    Trash2,
+    Upload,
+    X,
+} from "lucide-react";
 import { useProjectStore } from "@/lib/store";
 import { toast } from "sonner";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import Link from "next/link";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -25,11 +43,17 @@ const FALLBACK_CONTEXT = {
     },
     analysis: {
         product: "Curso de marketing digital",
-    }
+    },
 };
 const FALLBACK_ANGLES = [
-    { id: "fallback-1", text: "Ahorra 10 horas semanales automatizando procesos clave." },
-    { id: "fallback-2", text: "El método exacto para escalar tu agencia a 6 cifras." }
+    {
+        id: "fallback-1",
+        text: "Ahorra 10 horas semanales automatizando procesos clave.",
+    },
+    {
+        id: "fallback-2",
+        text: "El método exacto para escalar tu agencia a 6 cifras.",
+    },
 ];
 
 export default function FabricaCreativaPage() {
@@ -38,80 +62,107 @@ export default function FabricaCreativaPage() {
     const { user } = useUser();
     const { activeProjectId, projects, settings } = useProjectStore();
     const [mounted, setMounted] = useState(false);
-    const { t } = useTranslation(); // Added useTranslation hook
+    const { t } = useTranslation();
 
     const [angles, setAngles] = useState<{ id: string; text: string }[]>([]);
     const [selectedAngleId, setSelectedAngleId] = useState<string>("");
     const [variantCount, setVariantCount] = useState<string>("4");
     const [generationStyle, setGenerationStyle] = useState<string>("brand");
-    const [generationModel, setGenerationModel] = useState<string>("sdxl");
     const [generationFormat, setGenerationFormat] = useState<string>("4:5");
+
+    // User reference image
+    const [userImage, setUserImage] = useState<string | null>(null);
+    const [userImageMime, setUserImageMime] = useState<string>("image/jpeg");
 
     const [isGenerating, setIsGenerating] = useState(false);
     const [isFetching, setIsFetching] = useState(true);
     const [generatedImages, setGeneratedImages] = useState<string[]>([]);
     const [projectContext, setProjectContext] = useState<any>(null);
     const [savedCreatives, setSavedCreatives] = useState<any[]>([]);
-    const [generationsLeft, setGenerationsLeft] = useState<number | 'Ilimitado'>(100);
+    const [generationsLeft, setGenerationsLeft] = useState<
+        number | "Ilimitado"
+    >(100);
     const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+
+    const handleUserImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error("La imagen no puede superar 10MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result as string;
+            // Extract base64 data (remove data:image/xxx;base64, prefix)
+            const base64 = result.split(",")[1];
+            setUserImage(base64);
+            setUserImageMime(file.type || "image/jpeg");
+            toast.success("Foto de referencia cargada.");
+        };
+        reader.readAsDataURL(file);
+    };
 
     const fetchAngles = async () => {
         setIsFetching(true);
         try {
             if (!activeProjectId || !userId) return;
 
-            const token = await getToken({ template: 'supabase' });
+            const token = await getToken({ template: "supabase" });
             if (!token) return;
 
             const supabaseAuth = createClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                { global: { headers: { Authorization: `Bearer ${token}` } } }
+                {
+                    global: {
+                        headers: { Authorization: `Bearer ${token}` },
+                    },
+                }
             );
 
             const { data, error } = await supabaseAuth
-                .from('angles')
-                .select('*')
-                .eq('project_id', activeProjectId)
-                .eq('selected', true);
+                .from("angles")
+                .select("*")
+                .eq("project_id", activeProjectId)
+                .eq("selected", true);
 
             if (error) throw error;
 
             if (data && data.length > 0) {
-                const fetchedAngles = data.map(a => ({ id: a.id, text: a.angle_text }));
+                const fetchedAngles = data.map((a) => ({
+                    id: a.id,
+                    text: a.angle_text,
+                }));
                 setAngles(fetchedAngles);
                 setSelectedAngleId(fetchedAngles[0].id);
             } else {
                 setAngles([]);
             }
-            // Fetch current limits too
+
+            // Fetch current limits
             const { data: apiKeyData } = await supabaseAuth
-                .from('api_keys')
-                .select('daily_generations, last_generation_date')
-                .eq('user_id', userId)
+                .from("api_keys")
+                .select("daily_generations, last_generation_date")
+                .eq("user_id", userId)
                 .single();
 
-            const hasOwnImageKey =
-                (settings?.providersKeys?.replicate && settings.providersKeys.replicate.length > 0) ||
-                (settings?.providersKeys?.huggingface && settings.providersKeys.huggingface.length > 0);
-
-            if (hasOwnImageKey) {
-                setGenerationsLeft('Ilimitado');
-            } else if (apiKeyData) {
-                const today = new Date().toISOString().split('T')[0];
+            if (apiKeyData) {
+                const today = new Date().toISOString().split("T")[0];
                 if (apiKeyData.last_generation_date !== today) {
                     setGenerationsLeft(100);
                 } else if (apiKeyData.daily_generations !== null) {
                     let limit = apiKeyData.daily_generations;
-                    if (limit <= 0) limit = 100; // Reset to 100 just like backend
+                    if (limit <= 0) limit = 100;
                     setGenerationsLeft(limit);
                 } else {
                     setGenerationsLeft(100);
                 }
             } else {
-                setGenerationsLeft(100); // Default for new users without api_keys row
+                setGenerationsLeft(100);
             }
-
         } catch (error) {
             console.error("Error fetching angles:", error);
         } finally {
@@ -122,19 +173,23 @@ export default function FabricaCreativaPage() {
     const fetchSavedCreatives = async () => {
         if (!activeProjectId || !userId) return;
         try {
-            const token = await getToken({ template: 'supabase' });
+            const token = await getToken({ template: "supabase" });
             if (!token) return;
             const supabaseAuth = createClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                { global: { headers: { Authorization: `Bearer ${token}` } } }
+                {
+                    global: {
+                        headers: { Authorization: `Bearer ${token}` },
+                    },
+                }
             );
 
             const { data, error } = await supabaseAuth
-                .from('creatives')
-                .select('*')
-                .eq('project_id', activeProjectId)
-                .order('created_at', { ascending: false });
+                .from("creatives")
+                .select("*")
+                .eq("project_id", activeProjectId)
+                .order("created_at", { ascending: false });
 
             if (!error && data) {
                 setSavedCreatives(data);
@@ -145,68 +200,82 @@ export default function FabricaCreativaPage() {
     };
 
     const handleDeleteCreative = async (creativeId: string) => {
-        const confirmDelete = window.confirm(t.fabrica.confirmDelete); // Replaced string
+        const confirmDelete = window.confirm(t.fabrica.confirmDelete);
         if (!confirmDelete) return;
 
-        const loadingToast = toast.loading(t.fabrica.deletingCreative, { icon: '🗑️' }); // Replaced string
+        const loadingToast = toast.loading(t.fabrica.deletingCreative, {
+            icon: "🗑️",
+        });
 
         try {
             const res = await fetch("/api/delete-creative", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ creativeId })
+                body: JSON.stringify({ creativeId }),
             });
 
             const data = await res.json();
-            if (!res.ok || data.error) throw new Error(data.error || t.fabrica.deleteFailed); // Replaced string
+            if (!res.ok || data.error)
+                throw new Error(data.error || t.fabrica.deleteFailed);
 
-            setSavedCreatives(prev => prev.filter(c => c.id !== creativeId));
-            toast.success(t.fabrica.creativeDeleted, { id: loadingToast, icon: '✅' }); // Replaced string
-
+            setSavedCreatives((prev) =>
+                prev.filter((c) => c.id !== creativeId)
+            );
+            toast.success(t.fabrica.creativeDeleted, {
+                id: loadingToast,
+                icon: "✅",
+            });
         } catch (error: any) {
             console.error("Delete creative error", error);
-            toast.error(error.message || t.fabrica.deleteError, { id: loadingToast }); // Replaced string
+            toast.error(error.message || t.fabrica.deleteError, {
+                id: loadingToast,
+            });
         }
     };
 
     useEffect(() => {
         setMounted(true);
-        const project = activeProjectId ? projects.find(p => p.id === activeProjectId) : null;
+        const project = activeProjectId
+            ? projects.find((p) => p.id === activeProjectId)
+            : null;
 
         if (project) {
             setProjectContext({
                 creativeFormats: project.creativeFormats,
                 visualStyle: project.visualStyle,
                 identity: project.identity,
-                analysis: project.analysis
+                analysis: project.analysis,
             });
             fetchAngles();
             fetchSavedCreatives();
         } else {
-            // FALLBACK DUMMY DATA OR NO ANGLES
             setAngles(FALLBACK_ANGLES);
             setSelectedAngleId(FALLBACK_ANGLES[0].id);
             setProjectContext(FALLBACK_CONTEXT);
             setIsFetching(false);
             if (!activeProjectId) {
-                toast.info(t.fabrica.demoMode); // Replaced string
+                toast.info(t.fabrica.demoMode);
             }
         }
     }, [activeProjectId, projects, userId]);
 
     const handleGenerate = async () => {
-        setIsApiKeyModalOpen(false); // Make sure model doesn't block
+        setIsApiKeyModalOpen(false);
 
         if (angles.length === 0) {
-            toast.error(t.fabrica.noAnglesAvailable); // Replaced string
+            toast.error(t.fabrica.noAnglesAvailable);
             return;
         }
 
         const countPerAngle = parseInt(variantCount) || 1;
         const totalImagesToGenerate = countPerAngle * angles.length;
 
-        if (generationsLeft !== 'Ilimitado' && typeof generationsLeft === 'number' && generationsLeft < totalImagesToGenerate) {
-            toast.error(t.fabrica.limitExceeded(totalImagesToGenerate)); // Replaced string
+        if (
+            generationsLeft !== "Ilimitado" &&
+            typeof generationsLeft === "number" &&
+            generationsLeft < totalImagesToGenerate
+        ) {
+            toast.error(t.fabrica.limitExceeded(totalImagesToGenerate));
             return;
         }
 
@@ -214,31 +283,37 @@ export default function FabricaCreativaPage() {
         setGeneratedImages([]);
 
         try {
-            const token = await getToken({ template: 'supabase' });
-            if (!token) throw new Error(t.fabrica.notAuthenticated); // Replaced string
+            const token = await getToken({ template: "supabase" });
+            if (!token) throw new Error(t.fabrica.notAuthenticated);
 
-            toast.loading(t.fabrica.generatingForAngles(angles.length), { id: 'genToast' }); // Replaced string
+            toast.loading(
+                t.fabrica.generatingForAngles(angles.length),
+                { id: "genToast" }
+            );
 
             const generationPromises = angles.map(async (angleObj) => {
                 const payload = {
                     projectId: activeProjectId,
                     angleId: angleObj.id,
-                    variantCount,
+                    numVariants: variantCount,
                     userId: user?.id,
                     settings,
                     context: {
                         ...projectContext,
-                        angleText: angleObj.text
+                        angleText: angleObj.text,
                     },
                     freeStyle: generationStyle === "free",
-                    generationModel,
-                    supabaseToken: token
+                    generationFormat,
+                    supabaseToken: token,
+                    // Include user reference image if provided
+                    userImage: userImage || undefined,
+                    userImageMime: userImage ? userImageMime : undefined,
                 };
 
                 const res = await fetch("/api/generate-creatives", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
                 });
 
                 const responseText = await res.text();
@@ -247,11 +322,11 @@ export default function FabricaCreativaPage() {
                     data = JSON.parse(responseText);
                 } catch (e) {
                     console.error("Non-JSON:", responseText);
-                    throw new Error(t.fabrica.unexpectedServerError); // Replaced string
+                    throw new Error(t.fabrica.unexpectedServerError);
                 }
 
                 if (!res.ok || data.error) {
-                    throw new Error(data.error || t.fabrica.serverError); // Replaced string
+                    throw new Error(data.error || t.fabrica.serverError);
                 }
                 return data;
             });
@@ -261,16 +336,25 @@ export default function FabricaCreativaPage() {
             let allCreativeIds: string[] = [];
             let synchronousUrls: string[] = [];
 
-            results.forEach(res => {
+            results.forEach((res) => {
                 if (res.queued && res.creativeIds) {
-                    allCreativeIds = [...allCreativeIds, ...res.creativeIds];
+                    allCreativeIds = [
+                        ...allCreativeIds,
+                        ...res.creativeIds,
+                    ];
                 } else if (res.images) {
-                    synchronousUrls = [...synchronousUrls, ...res.images];
+                    synchronousUrls = [
+                        ...synchronousUrls,
+                        ...res.images,
+                    ];
                 }
             });
 
             if (allCreativeIds.length > 0) {
-                toast.loading(t.fabrica.jobsQueued(totalImagesToGenerate), { id: 'genToast' }); // Replaced string
+                toast.loading(
+                    t.fabrica.jobsQueued(totalImagesToGenerate),
+                    { id: "genToast" }
+                );
 
                 let attempts = 0;
                 const maxAttempts = 60;
@@ -278,28 +362,51 @@ export default function FabricaCreativaPage() {
                 const pollInterval = setInterval(async () => {
                     attempts++;
                     try {
-                        const statusRes = await fetch(`/api/creatives/status?ids=${allCreativeIds.join(',')}`);
+                        const statusRes = await fetch(
+                            `/api/creatives/status?ids=${allCreativeIds.join(",")}`
+                        );
                         const statusData = await statusRes.json();
 
-                        if (statusData.success && statusData.statuses) {
+                        if (
+                            statusData.success &&
+                            statusData.statuses
+                        ) {
                             const statusesObj = statusData.statuses;
-                            const allCompleted = Object.values(statusesObj).every((s: any) => s.status === 'completed');
+                            const allCompleted = Object.values(
+                                statusesObj
+                            ).every(
+                                (s: any) => s.status === "completed"
+                            );
 
-                            if (allCompleted || attempts >= maxAttempts) {
+                            if (
+                                allCompleted ||
+                                attempts >= maxAttempts
+                            ) {
                                 clearInterval(pollInterval);
 
-                                const finalUrls: string[] = Object.values(statusesObj)
-                                    .map((s: any) => s.url)
-                                    .filter(Boolean) as string[];
+                                const finalUrls: string[] =
+                                    Object.values(statusesObj)
+                                        .map((s: any) => s.url)
+                                        .filter(Boolean) as string[];
 
                                 setGeneratedImages(finalUrls);
 
-                                if (generationsLeft !== 'Ilimitado') {
-                                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - totalImagesToGenerate : prev);
+                                if (
+                                    generationsLeft !== "Ilimitado"
+                                ) {
+                                    setGenerationsLeft((prev) =>
+                                        typeof prev === "number"
+                                            ? prev -
+                                            totalImagesToGenerate
+                                            : prev
+                                    );
                                 }
 
                                 setIsGenerating(false);
-                                toast.success(t.fabrica.creativesGenerated, { id: 'genToast' }); // Replaced string
+                                toast.success(
+                                    t.fabrica.creativesGenerated,
+                                    { id: "genToast" }
+                                );
                                 fetchSavedCreatives();
                             }
                         }
@@ -309,57 +416,68 @@ export default function FabricaCreativaPage() {
                 }, 3000);
             } else if (synchronousUrls.length > 0) {
                 setGeneratedImages(synchronousUrls);
-                if (generationsLeft !== 'Ilimitado') {
-                    setGenerationsLeft(prev => typeof prev === 'number' ? prev - totalImagesToGenerate : prev);
+                if (generationsLeft !== "Ilimitado") {
+                    setGenerationsLeft((prev) =>
+                        typeof prev === "number"
+                            ? prev - totalImagesToGenerate
+                            : prev
+                    );
                 }
                 setIsGenerating(false);
-                toast.success(t.fabrica.creativesGenerated, { id: 'genToast' }); // Replaced string
+                toast.success(t.fabrica.creativesGenerated, {
+                    id: "genToast",
+                });
                 fetchSavedCreatives();
             } else {
-                toast.dismiss('genToast');
+                toast.dismiss("genToast");
                 setIsGenerating(false);
             }
-
         } catch (error: any) {
             console.error("Generación fallida:", error);
             setIsGenerating(false);
-            toast.error(error.message || t.fabrica.generationApiError, { id: 'genToast' }); // Replaced string
+            toast.error(error.message || t.fabrica.generationApiError, {
+                id: "genToast",
+            });
         }
     };
 
     const handleDownloadAll = async () => {
         if (generatedImages.length === 0) return;
 
-        toast.info(t.fabrica.preparingZip); // Replaced string
+        toast.info(t.fabrica.preparingZip);
         try {
             const zip = new JSZip();
 
-            // Fetch each image as a blob
-            const imagePromises = generatedImages.map(async (url, idx) => {
-                const response = await fetch(url);
-                const blob = await response.blob();
-                zip.file(`creativo_${idx + 1}.png`, blob);
-            });
+            const imagePromises = generatedImages.map(
+                async (url, idx) => {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    zip.file(`creativo_${idx + 1}.png`, blob);
+                }
+            );
 
             await Promise.all(imagePromises);
 
             const content = await zip.generateAsync({ type: "blob" });
             saveAs(content, "creativos_anglemaster.zip");
-            toast.success(t.fabrica.downloadComplete); // Replaced string
+            toast.success(t.fabrica.downloadComplete);
         } catch (error) {
             console.error("Error al descargar ZIP:", error);
-            toast.error(t.fabrica.zipError); // Replaced string
+            toast.error(t.fabrica.zipError);
         }
     };
 
-    const handleDownloadSingle = async (url: string, index: number) => {
+    const handleDownloadSingle = async (
+        url: string,
+        index: number
+    ) => {
         try {
             const response = await fetch(url);
             const blob = await response.blob();
             saveAs(blob, `creativo_${index + 1}.png`);
         } catch (error) {
             console.error("Error al descargar imagen:", error);
-            toast.error(t.fabrica.singleDownloadError); // Replaced string
+            toast.error(t.fabrica.singleDownloadError);
         }
     };
 
@@ -369,7 +487,7 @@ export default function FabricaCreativaPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
                 <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-4" />
-                <p className="text-zinc-500">{t.fabrica.loadingAngles}</p> {/* Replaced string */}
+                <p className="text-zinc-500">{t.fabrica.loadingAngles}</p>
             </div>
         );
     }
@@ -380,13 +498,16 @@ export default function FabricaCreativaPage() {
                 <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mb-6 border border-rose-500/20">
                     <AlertTriangle className="w-10 h-10 text-rose-500" />
                 </div>
-                <h1 className="text-3xl font-bold tracking-tight mb-4">{t.fabrica.noAnglesGenerated}</h1> {/* Replaced string */}
+                <h1 className="text-3xl font-bold tracking-tight mb-4">
+                    {t.fabrica.noAnglesGenerated}
+                </h1>
                 <p className="text-zinc-400 text-lg max-w-md mx-auto mb-8">
-                    {t.fabrica.noAnglesDescription} {/* Replaced string */}
+                    {t.fabrica.noAnglesDescription}
                 </p>
                 <Link href="/angulos">
                     <Button className="bg-white hover:bg-zinc-200 text-black px-8 py-6 rounded-full font-bold">
-                        <ArrowLeft className="w-5 h-5 mr-2" /> {t.fabrica.backToAngles} {/* Replaced string */}
+                        <ArrowLeft className="w-5 h-5 mr-2" />{" "}
+                        {t.fabrica.backToAngles}
                     </Button>
                 </Link>
             </div>
@@ -399,26 +520,36 @@ export default function FabricaCreativaPage() {
                 <div>
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400 font-medium mb-4">
                         <Wand2 className="w-3.5 h-3.5" />
-                        {t.fabrica.fase} {/* Replaced string */}
+                        {t.fabrica.fase}
                     </div>
                     <h1 className="text-4xl font-black tracking-tight mb-2 text-white">
-                        {t.fabrica.title} <span className="text-cyan-400">{t.fabrica.titleColor}</span> {/* Replaced string */}
+                        {t.fabrica.title}{" "}
+                        <span className="text-cyan-400">
+                            {t.fabrica.titleColor}
+                        </span>
                     </h1>
                     <p className="text-zinc-500 text-sm max-w-2xl">
-                        {t.fabrica.subtitle} {/* Replaced string */}
+                        {t.fabrica.subtitle}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs font-semibold text-emerald-400 whitespace-nowrap flex items-center gap-1.5">
+                        ⚡ Google Gemini
+                    </div>
                     <div className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-xs font-semibold text-violet-300 whitespace-nowrap">
-                        {t.fabrica.limiteDiario}: {generationsLeft} {t.fabrica.restantes} {/* Replaced string */}
+                        {t.fabrica.limiteDiario}: {generationsLeft}{" "}
+                        {t.fabrica.restantes}
                     </div>
                     <div className="flex gap-1 bg-white/5 rounded-full p-1 border border-white/10 text-xs text-zinc-400 font-medium shrink-0">
-                        {["1:1", "4:5", "9:16", "16:9", "4:3"].map((fmt) => (
+                        {["1:1", "4:5", "9:16", "16:9"].map((fmt) => (
                             <button
                                 key={fmt}
                                 onClick={() => setGenerationFormat(fmt)}
-                                className={`px-4 py-2 rounded-full transition-colors ${generationFormat === fmt ? "bg-cyan-900/50 text-cyan-400" : "hover:text-white"}`}
+                                className={`px-4 py-2 rounded-full transition-colors ${generationFormat === fmt
+                                        ? "bg-cyan-900/50 text-cyan-400"
+                                        : "hover:text-white"
+                                    }`}
                             >
                                 {fmt}
                             </button>
@@ -426,101 +557,203 @@ export default function FabricaCreativaPage() {
                     </div>
                     <Button
                         onClick={handleGenerate}
-                        disabled={isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))}
+                        disabled={
+                            isGenerating ||
+                            (generationsLeft !== "Ilimitado" &&
+                                generationsLeft < parseInt(variantCount))
+                        }
                         className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-6 h-10 shadow-[0_0_20px_rgba(124,58,237,0.3)] shrink-0 font-semibold"
                     >
-                        {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : (
-                            <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        {isGenerating ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                            <svg
+                                className="w-4 h-4 mr-2"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
                         )}
-                        {t.fabrica.generarTodo} {/* Replaced string */}
+                        {t.fabrica.generarTodo}
                     </Button>
                 </div>
             </div>
 
-
-
             <Card className="bg-[#0B0A0F] border-white/5 shadow-2xl relative overflow-hidden rounded-3xl">
                 <CardContent className="p-6 md:p-10 flex flex-col md:flex-row gap-10 min-h-[500px]">
-
                     {/* LEFT CONTENT */}
                     <div className="flex-1 flex flex-col justify-between space-y-8">
                         <div>
                             <div className="bg-[#0e0e12] border border-white/5 rounded-2xl p-6 relative">
                                 <span className="absolute -top-3 left-6 inline-block px-3 py-1 bg-violet-600 border border-violet-500 rounded-full text-[10px] text-white font-bold tracking-wider">
-                                    {angles.length === 1 ? t.fabrica.anguloSelec : `${angles.length} ${t.fabrica.angulosSelec}`} {/* Replaced string */}
+                                    {angles.length === 1
+                                        ? t.fabrica.anguloSelec
+                                        : `${angles.length} ${t.fabrica.angulosSelec}`}
                                 </span>
 
                                 <div className="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                                     {angles.map((a, i) => (
-                                        <div key={a.id} className="flex gap-3 text-sm text-zinc-300 items-start">
-                                            <div className="text-zinc-600 font-bold shrink-0 mt-0.5">{i + 1}.</div>
-                                            <p className="line-clamp-2 leading-relaxed">&ldquo;{a.text}&rdquo;</p>
+                                        <div
+                                            key={a.id}
+                                            className="flex gap-3 text-sm text-zinc-300 items-start"
+                                        >
+                                            <div className="text-zinc-600 font-bold shrink-0 mt-0.5">
+                                                {i + 1}.
+                                            </div>
+                                            <p className="line-clamp-2 leading-relaxed">
+                                                &ldquo;{a.text}&rdquo;
+                                            </p>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="bg-[#050505] border border-white/5 rounded-2xl p-6 space-y-6">
+                            {/* User reference image upload */}
+                            <div className="mt-4 bg-[#0e0e12] border border-white/5 rounded-2xl p-5">
+                                <label className="text-[10px] font-bold text-zinc-500 tracking-wider mb-3 block">
+                                    📸 FOTO DE REFERENCIA (OPCIONAL)
+                                </label>
+                                <p className="text-xs text-zinc-600 mb-3">
+                                    Sube la foto del cliente para generar
+                                    creativos ultra realistas manteniendo su
+                                    rostro e identidad.
+                                </p>
+                                {userImage ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10">
+                                            <img
+                                                src={`data:${userImageMime};base64,${userImage}`}
+                                                alt="Referencia"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-xs text-emerald-400 font-semibold">
+                                                ✓ Foto cargada
+                                            </p>
+                                            <p className="text-[10px] text-zinc-600">
+                                                Se usará como referencia visual
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() =>
+                                                setUserImage(null)
+                                            }
+                                            className="text-red-400 hover:text-red-300 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                        <div className="w-12 h-12 rounded-xl bg-white/5 border border-dashed border-white/10 flex items-center justify-center group-hover:border-indigo-500/50 transition-colors">
+                                            <Upload className="w-5 h-5 text-zinc-500 group-hover:text-indigo-400 transition-colors" />
+                                        </div>
+                                        <span className="text-xs text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                                            Subir foto del cliente
+                                        </span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={
+                                                handleUserImageUpload
+                                            }
+                                            className="hidden"
+                                        />
+                                    </label>
+                                )}
+                            </div>
+
+                            <div className="mt-4 bg-[#050505] border border-white/5 rounded-2xl p-6 space-y-6">
                                 <div>
-                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider mb-2 block">{t.fabrica.visual}</label> {/* Replaced string */}
-                                    <Select value={generationStyle} onValueChange={setGenerationStyle}>
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider mb-2 block">
+                                        {t.fabrica.visual}
+                                    </label>
+                                    <Select
+                                        value={generationStyle}
+                                        onValueChange={setGenerationStyle}
+                                    >
                                         <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="bg-zinc-900 border-white/10">
-                                            <SelectItem value="brand">{t.fabrica.brandIdentity}</SelectItem> {/* Replaced string */}
-                                            <SelectItem value="free">{t.fabrica.freeStyle}</SelectItem> {/* Replaced string */}
+                                            <SelectItem value="brand">
+                                                {t.fabrica.brandIdentity}
+                                            </SelectItem>
+                                            <SelectItem value="free">
+                                                {t.fabrica.freeStyle}
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
 
-                                    {generationStyle === 'brand' && (
+                                    {generationStyle === "brand" && (
                                         <div className="mt-3 p-3 bg-zinc-900/50 rounded-xl border border-white/5">
                                             <p className="text-zinc-300 text-xs italic line-clamp-2">
-                                                ★ {projectContext?.visualStyle || t.fabrica.visualStyleNotDefined} {/* Replaced string */}
+                                                ★{" "}
+                                                {projectContext?.visualStyle ||
+                                                    t.fabrica
+                                                        .visualStyleNotDefined}
                                             </p>
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="border-t border-white/5 pt-6">
-                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">{t.fabrica.formato}</label> {/* Replaced string */}
-                                    <Select value={generationFormat} onValueChange={setGenerationFormat}>
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">
+                                        {t.fabrica.formato}
+                                    </label>
+                                    <Select
+                                        value={generationFormat}
+                                        onValueChange={setGenerationFormat}
+                                    >
                                         <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="bg-zinc-900 border-white/10">
-                                            <SelectItem value="1:1">{t.fabrica.square}</SelectItem> {/* Replaced string */}
-                                            <SelectItem value="4:5">{t.fabrica.feed}</SelectItem> {/* Replaced string */}
-                                            <SelectItem value="9:16">{t.fabrica.storiesReels}</SelectItem> {/* Replaced string */}
-                                            <SelectItem value="16:9">{t.fabrica.wide}</SelectItem> {/* Replaced string */}
+                                            <SelectItem value="1:1">
+                                                {t.fabrica.square}
+                                            </SelectItem>
+                                            <SelectItem value="4:5">
+                                                {t.fabrica.feed}
+                                            </SelectItem>
+                                            <SelectItem value="9:16">
+                                                {t.fabrica.storiesReels}
+                                            </SelectItem>
+                                            <SelectItem value="16:9">
+                                                {t.fabrica.wide}
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
 
-                                <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-4">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">{t.fabrica.modelo}</label> {/* Replaced string */}
-                                        <Select value={generationModel} onValueChange={setGenerationModel}>
-                                            <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-900 border-white/10">
-                                                <SelectItem value="flux-pro">{t.fabrica.fluxPro}</SelectItem> {/* Replaced string */}
-                                                <SelectItem value="sdxl">{t.fabrica.sdxl}</SelectItem> {/* Replaced string */}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">{t.fabrica.variantes}</label> {/* Replaced string */}
-                                        <Select value={variantCount} onValueChange={setVariantCount}>
-                                            <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-zinc-900 border-white/10">
-                                                {[1, 2, 4].map(n => <SelectItem key={n} value={n.toString()}>{n} {t.fabrica.images}</SelectItem>)} {/* Replaced string */}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                <div className="border-t border-white/5 pt-6">
+                                    <label className="text-[10px] font-bold text-zinc-500 tracking-wider block mb-2">
+                                        {t.fabrica.variantes}
+                                    </label>
+                                    <Select
+                                        value={variantCount}
+                                        onValueChange={setVariantCount}
+                                    >
+                                        <SelectTrigger className="w-full bg-zinc-900 border-white/10 text-white h-10">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-zinc-900 border-white/10">
+                                            {[1, 2, 4].map((n) => (
+                                                <SelectItem
+                                                    key={n}
+                                                    value={n.toString()}
+                                                >
+                                                    {n}{" "}
+                                                    {t.fabrica.images}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>
@@ -528,11 +761,22 @@ export default function FabricaCreativaPage() {
                         <div>
                             <Button
                                 onClick={handleGenerate}
-                                disabled={isGenerating || (generationsLeft !== 'Ilimitado' && generationsLeft < parseInt(variantCount))}
+                                disabled={
+                                    isGenerating ||
+                                    (generationsLeft !== "Ilimitado" &&
+                                        generationsLeft <
+                                        parseInt(variantCount))
+                                }
                                 className="bg-violet-600 hover:bg-violet-500 text-white rounded-full px-8 py-6 font-semibold shadow-[0_4px_20px_rgba(124,58,237,0.3)] w-full sm:w-auto"
                             >
-                                {isGenerating ? <Loader2 className="w-5 h-5 mr-3 animate-spin" /> : <Wand2 className="w-5 h-5 mr-3 text-cyan-300" />}
-                                {isGenerating ? t.fabrica.generando : t.fabrica.generarImagen} {/* Replaced string */}
+                                {isGenerating ? (
+                                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                                ) : (
+                                    <Wand2 className="w-5 h-5 mr-3 text-cyan-300" />
+                                )}
+                                {isGenerating
+                                    ? t.fabrica.generando
+                                    : t.fabrica.generarImagen}
                             </Button>
                         </div>
                     </div>
@@ -543,13 +787,26 @@ export default function FabricaCreativaPage() {
                             <div
                                 className={`relative w-full rounded-2xl overflow-hidden shadow-2xl border border-white/10 group bg-zinc-900 transition-all duration-700 ease-in-out`}
                                 style={{
-                                    aspectRatio: generationFormat === '9:16' ? '9/16' : generationFormat === '16:9' ? '16/9' : generationFormat === '1:1' ? '1/1' : '4/5'
+                                    aspectRatio:
+                                        generationFormat === "9:16"
+                                            ? "9/16"
+                                            : generationFormat === "16:9"
+                                                ? "16/9"
+                                                : generationFormat === "1:1"
+                                                    ? "1/1"
+                                                    : "4/5",
                                 }}
                             >
-                                <img src={generatedImages[0]} crossOrigin="anonymous" className="w-full h-full object-cover transition-transform duration-700 ease-in-out" />
+                                <img
+                                    src={generatedImages[0]}
+                                    crossOrigin="anonymous"
+                                    className="w-full h-full object-cover transition-transform duration-700 ease-in-out"
+                                />
                                 {generatedImages.length > 1 && (
                                     <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20 text-xs font-bold text-white shadow-xl">
-                                        + {generatedImages.length - 1} variantes
+                                        +{" "}
+                                        {generatedImages.length - 1}{" "}
+                                        variantes
                                     </div>
                                 )}
                             </div>
@@ -557,19 +814,32 @@ export default function FabricaCreativaPage() {
                             <div
                                 className={`w-full rounded-3xl border border-white/5 bg-gradient-to-br from-white/[0.03] to-white/[0.01] flex flex-col items-center justify-center text-zinc-500 shadow-inner group transition-all duration-700 ease-in-out`}
                                 style={{
-                                    aspectRatio: generationFormat === '9:16' ? '9/16' : generationFormat === '16:9' ? '16/9' : generationFormat === '1:1' ? '1/1' : '4/5'
+                                    aspectRatio:
+                                        generationFormat === "9:16"
+                                            ? "9/16"
+                                            : generationFormat === "16:9"
+                                                ? "16/9"
+                                                : generationFormat === "1:1"
+                                                    ? "1/1"
+                                                    : "4/5",
                                 }}
                             >
                                 <div className="absolute inset-0 bg-grid-white/[0.02] bg-[length:32px_32px] pointer-events-none rounded-3xl" />
                                 <div className="w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 shadow-xl">
-                                    <ImageIcon strokeWidth={1} className="w-8 h-8 opacity-50 text-cyan-500" />
+                                    <ImageIcon
+                                        strokeWidth={1}
+                                        className="w-8 h-8 opacity-50 text-cyan-500"
+                                    />
                                 </div>
-                                <span className="text-sm font-semibold tracking-wide text-zinc-400">Previsualización Base</span>
-                                <span className="text-[10px] uppercase font-bold text-zinc-600 mt-2 tracking-widest bg-white/5 px-2 py-1 rounded-full">{generationFormat}</span>
+                                <span className="text-sm font-semibold tracking-wide text-zinc-400">
+                                    Previsualización Base
+                                </span>
+                                <span className="text-[10px] uppercase font-bold text-zinc-600 mt-2 tracking-widest bg-white/5 px-2 py-1 rounded-full">
+                                    {generationFormat}
+                                </span>
                             </div>
                         )}
                     </div>
-
                 </CardContent>
             </Card>
 
@@ -578,17 +848,25 @@ export default function FabricaCreativaPage() {
                 <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-700">
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                         <h2 className="text-2xl font-bold flex items-center gap-3">
-                            <ImageIcon className="w-6 h-6 text-cyan-400" /> Resultados Generados
+                            <ImageIcon className="w-6 h-6 text-cyan-400" />{" "}
+                            Resultados Generados
                         </h2>
-                        <Button onClick={handleDownloadAll} variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-full px-6">
-                            <Download className="w-4 h-4 mr-2" /> Descargar Todo (ZIP)
+                        <Button
+                            onClick={handleDownloadAll}
+                            variant="outline"
+                            className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-full px-6"
+                        >
+                            <Download className="w-4 h-4 mr-2" />{" "}
+                            Descargar Todo (ZIP)
                         </Button>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         {generatedImages.map((src, index) => (
-                            <div key={index} className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-zinc-900 border border-white/10 shadow-xl">
-                                {/* Next Image no es adecuado aquí por requerir dominios preconfigurados para imagenes dinamicas */}
+                            <div
+                                key={index}
+                                className="group relative rounded-2xl overflow-hidden aspect-[4/5] bg-zinc-900 border border-white/10 shadow-xl"
+                            >
                                 <img
                                     src={src}
                                     alt={`Variante ${index + 1}`}
@@ -597,14 +875,26 @@ export default function FabricaCreativaPage() {
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
                                     <div className="flex gap-2 w-full">
-                                        <Button size="sm" onClick={() => handleDownloadSingle(src, index)} className="w-full bg-cyan-600 hover:bg-cyan-500 text-white">
-                                            <Download className="w-4 h-4 mr-1" /> HD
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                handleDownloadSingle(
+                                                    src,
+                                                    index
+                                                )
+                                            }
+                                            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white"
+                                        >
+                                            <Download className="w-4 h-4 mr-1" />{" "}
+                                            HD
                                         </Button>
                                     </div>
                                 </div>
                                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20">
-                                        <span className="text-xs font-bold text-white">#{index + 1}</span>
+                                        <span className="text-xs font-bold text-white">
+                                            #{index + 1}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -618,20 +908,29 @@ export default function FabricaCreativaPage() {
                 <div className="space-y-6 mt-16 border-t border-white/10 pt-16 animate-in slide-in-from-bottom-8 duration-700">
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                         <h2 className="text-2xl font-bold flex items-center gap-3 text-zinc-300">
-                            <ImageIcon className="w-6 h-6 text-zinc-500" /> Archivo de Creativos
+                            <ImageIcon className="w-6 h-6 text-zinc-500" />{" "}
+                            Archivo de Creativos
                         </h2>
                     </div>
 
                     {savedCreatives.length === 0 ? (
                         <div className="p-12 border border-white/5 rounded-2xl bg-zinc-900/50 flex flex-col items-center justify-center text-center">
                             <ImageIcon className="w-12 h-12 text-zinc-600 mb-4 opacity-50" />
-                            <h3 className="text-zinc-400 font-medium">No hay creativos guardados</h3>
-                            <p className="text-xs text-zinc-600 mt-2 max-w-sm">Los creativos que generes para este proyecto aparecerán aquí y formarán parte del historial contable de tu Dashboard.</p>
+                            <h3 className="text-zinc-400 font-medium">
+                                No hay creativos guardados
+                            </h3>
+                            <p className="text-xs text-zinc-600 mt-2 max-w-sm">
+                                Los creativos que generes para este proyecto
+                                aparecerán aquí.
+                            </p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                             {savedCreatives.map((creative) => (
-                                <div key={creative.id} className="group relative rounded-xl overflow-hidden aspect-square bg-zinc-900 border border-white/5 hover:border-white/20 transition-all">
+                                <div
+                                    key={creative.id}
+                                    className="group relative rounded-xl overflow-hidden aspect-square bg-zinc-900 border border-white/5 hover:border-white/20 transition-all"
+                                >
                                     <img
                                         src={creative.image_url}
                                         alt="Creativo Guardado"
@@ -639,11 +938,30 @@ export default function FabricaCreativaPage() {
                                         crossOrigin="anonymous"
                                     />
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-2 p-4">
-                                        <Button size="sm" onClick={() => handleDownloadSingle(creative.image_url, 0)} className="w-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md">
-                                            <Download className="w-4 h-4 mr-2" /> Descargar
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                handleDownloadSingle(
+                                                    creative.image_url,
+                                                    0
+                                                )
+                                            }
+                                            className="w-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md"
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />{" "}
+                                            Descargar
                                         </Button>
-                                        <Button size="sm" onClick={() => handleDeleteCreative(creative.id)} className="w-full bg-red-500/20 hover:bg-red-500 hover:text-white text-red-200 backdrop-blur-md transition-colors border border-red-500/30">
-                                            <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                handleDeleteCreative(
+                                                    creative.id
+                                                )
+                                            }
+                                            className="w-full bg-red-500/20 hover:bg-red-500 hover:text-white text-red-200 backdrop-blur-md transition-colors border border-red-500/30"
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" />{" "}
+                                            Eliminar
                                         </Button>
                                     </div>
                                 </div>
@@ -656,7 +974,11 @@ export default function FabricaCreativaPage() {
             <ApiKeyModal
                 isOpen={isApiKeyModalOpen}
                 onClose={() => setIsApiKeyModalOpen(false)}
-                onSuccess={() => { toast.success("API Key guardada. Ahora puedes generar creativos.") }}
+                onSuccess={() => {
+                    toast.success(
+                        "API Key guardada. Ahora puedes generar creativos."
+                    );
+                }}
             />
         </div>
     );

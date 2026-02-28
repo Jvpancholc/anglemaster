@@ -1,0 +1,114 @@
+﻿node.exe : npm warn 
+cleanup Failed to remove 
+some directories [
+En línea: 1 Carácter: 1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (npm  
+   warn cleanu...e direc   
+ tories [:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+npm warn cleanup   [
+npm warn cleanup     'C:\\U
+sers\\Jvpan\\proyectos\\ang
+lemaster\\node_modules\\esl
+int-plugin-react\\node_modu
+les\\resolve',
+npm warn cleanup     
+[Error: EPERM: operation 
+not permitted, rmdir 'C:\Us
+ers\Jvpan\proyectos\anglema
+ster\node_modules\eslint-pl
+ugin-react\node_modules\res
+olve\test\resolver\symlinke
+d\_'] {
+npm warn cleanup       
+errno: -4048,
+npm warn cleanup       
+code: 'EPERM',
+npm warn cleanup       
+syscall: 'rmdir',
+npm warn cleanup       
+path: 'C:\\Users\\Jvpan\\pr
+oyectos\\anglemaster\\node_
+modules\\eslint-plugin-reac
+t\\node_modules\\resolve\\t
+est\\resolver\\symlinked\\_
+'
+npm warn cleanup     }
+npm warn cleanup   ],
+npm warn cleanup   [
+npm warn cleanup     '\\\\?
+\\C:\\Users\\Jvpan\\proyect
+os\\anglemaster\\node_modul
+es\\next',
+npm warn cleanup     
+[Error: EPERM: operation 
+not permitted, rmdir 'C:\Us
+ers\Jvpan\proyectos\anglema
+ster\node_modules\next\dist
+\shared'] {
+npm warn cleanup       
+errno: -4048,
+npm warn cleanup       
+code: 'EPERM',
+npm warn cleanup       
+syscall: 'rmdir',
+npm warn cleanup       
+path: 'C:\\Users\\Jvpan\\pr
+oyectos\\anglemaster\\node_
+modules\\next\\dist\\shared
+'
+npm warn cleanup     }
+npm warn cleanup   ],
+npm warn cleanup   [
+npm warn cleanup     'C:\\U
+sers\\Jvpan\\proyectos\\ang
+lemaster\\node_modules\\nex
+t',
+npm warn cleanup     
+[Error: EPERM: operation 
+not permitted, rmdir 'C:\Us
+ers\Jvpan\proyectos\anglema
+ster\node_modules\next\dist
+\build\webpack\config'] {
+npm warn cleanup       
+errno: -4048,
+npm warn cleanup       
+code: 'EPERM',
+npm warn cleanup       
+syscall: 'rmdir',
+npm warn cleanup       
+path: 'C:\\Users\\Jvpan\\pr
+oyectos\\anglemaster\\node_
+modules\\next\\dist\\build\
+\webpack\\config'
+npm warn cleanup     }
+npm warn cleanup   ]
+npm warn cleanup ]
+npm error code ENOTEMPTY
+npm error syscall rmdir
+npm error path C:\Users\Jvp
+an\proyectos\anglemaster\no
+de_modules\next\dist\build
+npm error errno -4051
+npm error ENOTEMPTY: 
+directory not empty, rmdir 
+'C:\Users\Jvpan\proyectos\a
+nglemaster\node_modules\nex
+t\dist\build'
+npm error A complete log 
+of this run can be found 
+in: C:\Users\Jvpan\AppData\
+Local\npm-cache\_logs\2026-
+02-28T02_27_54_803Z-debug-0
+.log

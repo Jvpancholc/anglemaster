@@ -408,6 +408,7 @@ export const dictionaries = {
             feed: "Feed (4:5)",
             storiesReels: "Stories/Reels (9:16)",
             wide: "Wide (16:9)",
+            nanoBanana2: "Nano Banana 2 ⚡ (Gratis)",
             fluxPro: "Flux 1.1 Pro",
             sdxl: "SD XL",
             images: "Imágenes"
@@ -820,6 +821,7 @@ export const dictionaries = {
             feed: "Feed (4:5)",
             storiesReels: "Stories/Reels (9:16)",
             wide: "Wide (16:9)",
+            nanoBanana2: "Nano Banana 2 ⚡ (Free)",
             fluxPro: "Flux 1.1 Pro",
             sdxl: "SD XL",
             images: "Images"
@@ -1232,6 +1234,7 @@ export const dictionaries = {
             feed: "Feed (4:5)",
             storiesReels: "Stories/Reels (9:16)",
             wide: "Wide (16:9)",
+            nanoBanana2: "Nano Banana 2 ⚡ (Grátis)",
             fluxPro: "Flux 1.1 Pro",
             sdxl: "SD XL",
             images: "Imagens"

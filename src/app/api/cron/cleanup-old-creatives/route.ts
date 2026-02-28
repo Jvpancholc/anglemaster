@@ -22,12 +22,12 @@ export async function GET(req: Request) {
     }
 
     try {
-        console.log("[CRON] Iniciando tarea de limpieza de imágenes antiguas (7 días)...");
+        console.log("[CRON] Iniciando tarea de limpieza de imágenes antiguas (3 días)...");
 
-        // 1. Calcular la fecha límite (7 días atrás)
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const thresholdDate = sevenDaysAgo.toISOString();
+        // 1. Calcular la fecha límite (3 días atrás)
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const thresholdDate = threeDaysAgo.toISOString();
 
         // 2. Buscar registros viejos
         const { data: oldCreatives, error: searchError } = await supabase

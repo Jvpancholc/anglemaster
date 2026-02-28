@@ -1,42 +1,47 @@
-import { SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/nextjs";
+"use client";
+
+import { useAuth } from "@clerk/nextjs";
 import { ArrowRight, Sparkles, Zap, Image as ImageIcon, LayoutTemplate } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
-export default async function LandingPage() {
-    // Si ya tiene sesión iniciada, va directo al dashboard
-    const { userId } = await auth();
-    if (userId) {
-        redirect("/dashboard");
-    }
+export default function LandingPage() {
+    const { isSignedIn, isLoaded } = useAuth();
+    const router = useRouter();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        if (isLoaded && isSignedIn) {
+            router.replace("/dashboard");
+        }
+    }, [isLoaded, isSignedIn, router]);
+
+    if (!mounted) return null;
 
     return (
         <div className="flex flex-col min-h-screen bg-black text-white selection:bg-pink-500/30">
-            {/* Promotional Banner (Only for unauthenticated users) */}
-            <SignedOut>
-                <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-center sm:px-6 lg:px-8 relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-[100%] animate-[shimmer_3s_infinite]" />
+            {/* Promotional Banner */}
+            <div className="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-3 text-center sm:px-6 lg:px-8 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-[100%] animate-[shimmer_3s_infinite]" />
 
-                    <p className="text-sm font-semibold text-white relative z-10 mx-auto max-w-4xl flex flex-col sm:flex-row items-center justify-center gap-2">
-                        <span className="flex items-center gap-1">
-                            <Zap className="w-4 h-4 text-yellow-300 animate-pulse" />
-                            <span className="bg-white/20 px-2 py-0.5 rounded text-xs tracking-wider uppercase backdrop-blur-sm mr-1">Oferta Flash</span>
-                        </span>
-                        <span>
-                            Solo por tiempo limitado: la app creativa desde <strong className="text-yellow-300">$49.99/mensual</strong> con planes exclusivos.
-                        </span>
-                        <span className="hidden sm:inline-block mx-2 opacity-50">•</span>
-                        <SignInButton fallbackRedirectUrl="/dashboard" mode="modal">
-                            <button className="underline decoration-white/50 underline-offset-4 hover:decoration-white transition-all font-bold group-hover:text-yellow-200">
-                                Acceder
-                            </button>
-                        </SignInButton>
-                    </p>
-                </div>
-            </SignedOut>
+                <p className="text-sm font-semibold text-white relative z-10 mx-auto max-w-4xl flex flex-col sm:flex-row items-center justify-center gap-2">
+                    <span className="flex items-center gap-1">
+                        <Zap className="w-4 h-4 text-yellow-300 animate-pulse" />
+                        <span className="bg-white/20 px-2 py-0.5 rounded text-xs tracking-wider uppercase backdrop-blur-sm mr-1">Oferta Flash</span>
+                    </span>
+                    <span>
+                        Solo por tiempo limitado: la app creativa desde <strong className="text-yellow-300">$49.99/mensual</strong> con planes exclusivos.
+                    </span>
+                    <span className="hidden sm:inline-block mx-2 opacity-50">•</span>
+                    <Link href="/sign-in" className="underline decoration-white/50 underline-offset-4 hover:decoration-white transition-all font-bold group-hover:text-yellow-200">
+                        Acceder
+                    </Link>
+                </p>
+            </div>
 
             {/* Nav */}
             <header className="flex items-center justify-between p-6 border-b border-white/5 bg-black/50 backdrop-blur-md sticky top-0 z-50">
@@ -47,11 +52,9 @@ export default async function LandingPage() {
                     <span className="text-xl font-bold tracking-tight">AngleMaster</span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <SignedOut>
-                        <SignInButton fallbackRedirectUrl="/dashboard" mode="modal">
-                            <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-6 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">Iniciar Sesión</Button>
-                        </SignInButton>
-                    </SignedOut>
+                    <Link href="/sign-in">
+                        <Button className="bg-white text-black hover:bg-zinc-200 rounded-full px-6 font-semibold shadow-xl hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all">Iniciar Sesión</Button>
+                    </Link>
                 </div>
             </header>
 
@@ -72,11 +75,11 @@ export default async function LandingPage() {
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-10 duration-1000 z-10">
-                    <SignInButton fallbackRedirectUrl="/dashboard" mode="modal">
+                    <Link href="/sign-in">
                         <Button className="bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-500 hover:to-orange-500 text-white rounded-full px-10 py-7 text-xl font-bold shadow-[0_0_40px_rgba(236,72,153,0.3)] border-0 transition-transform hover:scale-105">
                             Acceso Privado <ArrowRight className="w-6 h-6 ml-2" />
                         </Button>
-                    </SignInButton>
+                    </Link>
                 </div>
 
                 {/* Features Grid */}
@@ -104,6 +107,16 @@ export default async function LandingPage() {
                     </div>
                 </div>
             </main>
+
+            {/* Footer */}
+            <footer className="border-t border-white/5 bg-black py-8 px-6">
+                <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-zinc-500">
+                    <p>&copy; {new Date().getFullYear()} AngleMaster. Todos los derechos reservados.</p>
+                    <div className="flex gap-6">
+                        <Link href="/terms" className="hover:text-zinc-300 transition-colors">Términos y Privacidad</Link>
+                    </div>
+                </div>
+            </footer>
         </div>
     );
 }

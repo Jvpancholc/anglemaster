@@ -41,17 +41,11 @@ export interface Project {
 
 export interface ProviderKeysConfig {
     gemini?: string[];
-    groq?: string[];
-    replicate?: string[];
-    huggingface?: string[];
 }
 
 export interface ProjectSettings {
-    openAiKey?: string | null;
-    replicateKey?: string | null;
     geminiKey?: string | null;
     providersKeys?: ProviderKeysConfig;
-    aiProvider?: string;
     language?: string;
 }
 
@@ -101,16 +95,10 @@ const emptyProject: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'name'> = {
 };
 
 const defaultSettings: ProjectSettings = {
-    openAiKey: '',
-    replicateKey: '',
     geminiKey: '',
     providersKeys: {
         gemini: [],
-        groq: [],
-        replicate: [],
-        huggingface: []
     },
-    aiProvider: 'openai',
     language: 'ES'
 };
 
@@ -156,11 +144,23 @@ export const useProjectStore = create<ProjectState>()(
         }),
         {
             name: 'anglemaster-state',
+            version: 1, // Add version for future migrations
             partialize: (state) => ({
-                projects: state.projects,
+                projects: state.projects || [],
                 activeProjectId: state.activeProjectId,
-                settings: state.settings,
+                settings: state.settings || defaultSettings,
             }),
+            // Ensure projects is always an array even if corrupted in storage
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    if (!Array.isArray(state.projects)) {
+                        state.projects = [];
+                    }
+                    if (!state.settings) {
+                        state.settings = defaultSettings;
+                    }
+                }
+            }
         }
     )
 );

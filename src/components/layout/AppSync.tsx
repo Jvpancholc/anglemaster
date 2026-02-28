@@ -31,48 +31,55 @@ export function AppSync() {
                     { global: { headers: { Authorization: `Bearer ${token}` } } }
                 );
 
-                // 1. Check API Keys first (Crucial for bypass/blocking)
-                let apiData: any, apiError: any;
+                // 1. Check API Keys — try with providers_keys, fall back to gemini_key only
+                let apiData: any = null;
+                let apiQuerySucceeded = false;
+
+                // Try the full query first (with providers_keys column)
                 const res = await supabaseAuth
                     .from('api_keys')
                     .select('gemini_key, providers_keys')
                     .eq('user_id', user.id)
                     .single();
 
-                apiData = res.data;
-                apiError = res.error;
-
-                if (apiError && apiError.code === 'PGRST204') {
-                    // Fallback to old schema
+                if (res.data) {
+                    apiData = res.data;
+                    apiQuerySucceeded = true;
+                } else if (res.error && res.error.code !== 'PGRST116') {
+                    // Query failed (maybe providers_keys column doesn't exist) — try legacy
                     const fallbackRes = await supabaseAuth
                         .from('api_keys')
                         .select('gemini_key')
                         .eq('user_id', user.id)
                         .single();
-                    apiData = fallbackRes.data;
-                    apiError = fallbackRes.error;
+
+                    if (fallbackRes.data) {
+                        apiData = fallbackRes.data;
+                        apiQuerySucceeded = true;
+                    } else if (fallbackRes.error?.code === 'PGRST116') {
+                        // PGRST116 = no rows found — user has no api_keys record at all
+                        apiQuerySucceeded = true; // query worked, just no data
+                    }
+                } else if (res.error?.code === 'PGRST116') {
+                    // No rows found — user has no api_keys record at all
+                    apiQuerySucceeded = true;
                 }
 
-                if (apiError && apiError.code !== 'PGRST116') {
-                    // console.error("Error buscando API keys:", apiError);
-                }
-
+                // Update store with whatever we found
                 if (apiData?.providers_keys) {
                     updateSettings({ providersKeys: apiData.providers_keys });
                 } else if (apiData?.gemini_key) {
-                    // Legacy migration fallback
                     updateSettings({ geminiKey: apiData.gemini_key });
                 }
 
+                // Friendly reminder if no keys configured — informational only, never blocks navigation
                 const hasAnyKey =
                     (apiData?.providers_keys?.gemini?.length > 0) ||
-                    (apiData?.providers_keys?.groq?.length > 0) ||
-                    (apiData?.providers_keys?.replicate?.length > 0) ||
-                    (apiData?.providers_keys?.huggingface?.length > 0) ||
                     apiData?.gemini_key;
 
-                // BYOK Optional: We no longer force the user to setup a key here
-                // They can use global keys up to the daily_generations limit
+                if (!hasAnyKey) {
+                    toast.info("💡 Para generar creativos, configura tu clave de Google Gemini en Preferencias.", { duration: 5000 });
+                }
 
                 // 2. Buscar proyectos existentes del usuario en la base de datos
                 const { data: dbProjects, error } = await supabaseAuth

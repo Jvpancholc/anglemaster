@@ -1,0 +1,29 @@
+﻿Ôû▓ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.0.9:3001
+- Environments: .env.local
+
+Ô£ô Starting...
+node : Ô¿» Unable to 
+acquire lock at C:\Users\Jv
+pan\proyectos\anglemaster\.
+next\dev\lock, is another 
+instance of next dev 
+running?
+En línea: 1 Carácter: 1
++ node node_modules\next\di
+st\bin\next dev --port 
+3001 2>&1 | Out-File  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo         
+     : NotSpecified: (Ô¿»  
+   Unable to a...xt dev    
+ running?:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 
+  Suggestion: If you intended to restart next dev, terminate the other process, and then try again.
+[?25h

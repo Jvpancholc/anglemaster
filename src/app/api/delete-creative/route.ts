@@ -11,7 +11,7 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { creativeId } = body;
 
-        const { userId, getToken } = await auth();
+        const { userId } = await auth();
 
         if (!userId) {
             return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -21,12 +21,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "ID de creativo requerido" }, { status: 400 });
         }
 
-        const token = await getToken({ template: 'supabase' });
-
-        // Use user's JWT to execute queries with RLS properly passed
-        const supabase = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
-            global: { headers: { Authorization: `Bearer ${token}` } }
-        });
+        // Use service role key to bypass RLS — ownership is verified manually below
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
         // 1. Fetch the creative to ensure ownership and get the storage path
         const { data: creative, error: fetchError } = await supabase
